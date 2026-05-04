@@ -14,3 +14,17 @@ Storage | URI         | Implementation | Description
 Null    | `nullfs://` | nullfs.go      | Acts as `/dev/null`. Any files written to this location are forgotten. Reads always resolve to empty files. All directories are read with no contents.
 Memory  | `memfs://`  | memfs.go       | Stores files with virtual memory of the application. Forgotten when the application stops.
 Local   | `file://`   | localfs.go     | Local files on the hard drive. The URI specifies the mount point of the local file system. Access to files outside of the mounted directory are not allowed. This is backed by Go's `os.RootFS`.
+
+## Commands
+
+```bash
+# Build
+go build ./...
+
+# Test
+go test ./...
+
+# Lint
+go fmt ./...
+go vet ./...
+```
