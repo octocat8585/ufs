@@ -19,16 +19,14 @@ type File interface {
 	io.StringWriter
 }
 
-// ReadOnlyFS represents a read-only file system.
-type ReadOnlyFS interface {
+// ReadFS represents a read-only file system.
+type ReadFS interface {
 	fs.FS
 	io.Closer
-	// String returns a string description of the underly file system.
-	String() string
 }
 
 type FS interface {
-	ReadOnlyFS
+	ReadFS
 
 	// Create a new file or directory within the file system.
 	Create(name string) (File, error)
