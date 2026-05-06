@@ -11,6 +11,9 @@ go build ./...
 # Test
 go test ./...
 
+# Test with race detector (required for presubmit)
+CGO_ENABLED=1 go test -race ./...
+
 # Run a single test
 go test -run TestName ./...
 
@@ -19,6 +22,9 @@ golangci-lint run
 
 # Vet
 go vet ./...
+
+# Presubmit (lint + both test modes)
+make presubmit
 ```
 
 ## Architecture
@@ -36,10 +42,23 @@ go vet ./...
 
 Each file system backend is a private struct in its own file implementing the `FS` interface:
 
-| File | Type | Behavior |
-|------|------|----------|
-| `nullfs.go` | `nullFS` | `/dev/null` semantics — writes are discarded, reads return empty |
-| `memfs.go` | `memFS` | In-memory storage, lost when the process exits |
-| `localfs.go` | `localFS` | Local disk, mounted at a root path via `os.RootFS`; access outside the mount point is disallowed |
+| File | Type | Status | Behavior |
+|------|------|--------|----------|
+| `nullfs.go` | `nullFS` | Implemented | `/dev/null` semantics — writes are discarded, reads return empty |
+| `memfs.go` | `memFS` | Stub (TODO) | In-memory storage, lost when the process exits |
+| `localfs.go` | `localFS` | Implemented | Local disk, mounted at a root path via `os.OpenRoot` (Go 1.24+); access outside mount point is disallowed |
+| `angryfs.go` | `angryFS` | Implemented | Always returns `fs.ErrInvalid`; used to test error-handling paths |
 
-All three are currently stubs with `TODO` comments. When implementing, keep the struct private and expose construction through a package-level factory function (e.g., `NewNullFS() FS`).
+### Supporting files
+
+| File | Purpose |
+|------|---------|
+| `info.go` | `fsInfo` — concrete `fs.FileInfo` implementation |
+| `util.go` | `validPath()` — validates paths against `fs.ValidPath` before all `Open`/`Create` calls |
+| `testing_test.go` | `testFileSystem()` — shared CRUD + `fstest.TestFS` harness used by each backend's tests |
+
+### Conventions
+
+- Keep structs private; expose construction via `newXxxFS(name string) (FS, error)`
+- Factory `name` arg follows a URI scheme: `null://`, `file:///abs/path` (localfs strips the `file://` prefix)
+- All path operations call `validPath()` first — returns `*fs.PathError` for invalid paths
