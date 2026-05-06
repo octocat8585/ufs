@@ -34,17 +34,17 @@ var (
 type memFS struct {
 	mu   sync.RWMutex
 	root string
-	ents ents
+	dir  memNodeMap
 }
 
-type ent struct {
+type memNode struct {
 	name    string
 	content []byte
 	mode    fs.FileMode
 	modTime time.Time
 }
 
-type ents map[string]*ent
+type memNodeMap map[string]*memNode
 
 type memFile struct {
 	name      string
@@ -105,7 +105,7 @@ func (f *memFile) WriteString(s string) (int, error) {
 	// Sync back to the filesystem
 	if f.fsys != nil && !f.mode.IsDir() {
 		f.fsys.mu.Lock()
-		if e, ok := f.fsys.ents[f.name]; ok {
+		if e, ok := f.fsys.dir[f.name]; ok {
 			e.content = bytes.Clone(f.content)
 			e.modTime = f.modTime
 		}
@@ -160,7 +160,7 @@ func (f *memFile) Readdir(n int) ([]fs.FileInfo, error) {
 	// Collect all unique child names
 	seen := make(map[string]bool)
 	var childNames []string
-	for key := range fsys.ents {
+	for key := range fsys.dir {
 		if key == "." {
 			continue
 		}
@@ -184,9 +184,9 @@ func (f *memFile) Readdir(n int) ([]fs.FileInfo, error) {
 	// Build file info for each child
 	all := make([]fs.FileInfo, 0, len(childNames))
 	for _, childName := range childNames {
-		e := fsys.ents[prefix+childName]
+		e := fsys.dir[prefix+childName]
 		if e == nil {
-			e = fsys.ents[prefix+childName+"/"]
+			e = fsys.dir[prefix+childName+"/"]
 		}
 		if e != nil {
 			all = append(all, &fsInfo{
@@ -283,7 +283,7 @@ func (fsys *memFS) Create(name string) (File, error) {
 	defer fsys.mu.Unlock()
 
 	now := time.Now()
-	fsys.ents[name] = &ent{
+	fsys.dir[name] = &memNode{
 		name:    path.Base(name),
 		content: nil,
 		mode:    fs.ModePerm,
@@ -322,8 +322,8 @@ func (fsys *memFS) MkdirAll(name string, perm fs.FileMode) error {
 			continue
 		}
 		accum += part + "/"
-		if _, ok := fsys.ents[accum]; !ok {
-			fsys.ents[accum] = &ent{
+		if _, ok := fsys.dir[accum]; !ok {
+			fsys.dir[accum] = &memNode{
 				name:    part,
 				content: nil,
 				mode:    fs.ModeDir | perm,
@@ -334,14 +334,14 @@ func (fsys *memFS) MkdirAll(name string, perm fs.FileMode) error {
 	return nil
 }
 
-func (fsys *memFS) findEnt(name string) (*ent, error) {
-	e, ok := fsys.ents[name]
+func (fsys *memFS) findEnt(name string) (*memNode, error) {
+	e, ok := fsys.dir[name]
 	if ok {
 		return e, nil
 	}
 	// Try with trailing slash for directories
 	slashName := name + "/"
-	e, ok = fsys.ents[slashName]
+	e, ok = fsys.dir[slashName]
 	if ok {
 		return e, nil
 	}
@@ -360,8 +360,8 @@ func (fsys *memFS) ensureParent(dir string, now time.Time) {
 			continue
 		}
 		accum += part + "/"
-		if _, ok := fsys.ents[accum]; !ok {
-			fsys.ents[accum] = &ent{
+		if _, ok := fsys.dir[accum]; !ok {
+			fsys.dir[accum] = &memNode{
 				name:    part,
 				content: nil,
 				mode:    fs.ModeDir | fs.ModePerm,
@@ -374,6 +374,6 @@ func (fsys *memFS) ensureParent(dir string, now time.Time) {
 func newMemFS(name string) (FS, error) {
 	return &memFS{
 		root: strings.TrimPrefix(name, "mem://"),
-		ents: ents{},
+		dir:  memNodeMap{},
 	}, nil
 }
