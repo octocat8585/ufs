@@ -16,54 +16,40 @@ package ufs
 
 import (
 	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 var (
-	_ File = (*os.File)(nil)
-	_ FS   = (*localFS)(nil)
+	_ FS = (*angryFS)(nil)
+
+	errAngry = fs.ErrInvalid
 )
 
-type localFS struct {
-	osFS *os.Root
+type angryFS struct {
 }
 
-func (fsys *localFS) Open(name string) (fs.File, error) {
+func (fsys *angryFS) Open(name string) (fs.File, error) {
 	if err := validPath("open", name); err != nil {
 		return nil, err
 	}
-	return fsys.osFS.Open(name)
+	return nil, errAngry
 }
 
-func (fsys *localFS) Close() error {
-	return fsys.osFS.Close()
+func (fsys *angryFS) Close() error {
+	return errAngry
 }
 
-func (fsys *localFS) Create(name string) (File, error) {
+func (fsys *angryFS) Create(name string) (File, error) {
 	if err := validPath("create", name); err != nil {
 		return nil, err
 	}
 
-	return fsys.osFS.Create(name)
+	return nil, errAngry
 }
 
-func (fsys *localFS) MkdirAll(name string, perm fs.FileMode) error {
-	return fsys.osFS.MkdirAll(name, perm)
+func (fsys *angryFS) MkdirAll(name string, perm fs.FileMode) error {
+	return errAngry
 }
 
-func newLocalFS(name string) (FS, error) {
-	name = strings.TrimPrefix(name, "file://")
-	absPath, err := filepath.Abs(name)
-	if err != nil {
-		return nil, err
-	}
-	osFS, err := os.OpenRoot(absPath)
-	if err != nil {
-		return nil, err
-	}
-	return &localFS{
-		osFS: osFS,
-	}, nil
+func newAngryFS(name string) (FS, error) {
+	return &angryFS{}, nil
 }

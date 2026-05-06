@@ -14,6 +14,19 @@
 
 package ufs
 
-type memFS struct {
-	// TODO: Implement FS interface
+import (
+	"fmt"
+	"io/fs"
+	"runtime"
+)
+
+func validPath(op string, name string) error {
+	if !fs.ValidPath(name) {
+		return &fs.PathError{
+			Op:   op,
+			Path: name,
+			Err:  fmt.Errorf("%q is not a valid path for %s, %w", name, runtime.GOOS, fs.ErrInvalid),
+		}
+	}
+	return nil
 }

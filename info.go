@@ -14,6 +14,44 @@
 
 package ufs
 
-type memFS struct {
-	// TODO: Implement FS interface
+import (
+	"io/fs"
+	"time"
+)
+
+var (
+	_ FileInfo = (*fsInfo)(nil)
+)
+
+type fsInfo struct {
+	name    string
+	size    int64
+	mode    fs.FileMode
+	modTime time.Time
+	isDir   bool
+	sys     any
+}
+
+func (finfo *fsInfo) Name() string {
+	return finfo.name
+}
+
+func (finfo *fsInfo) Size() int64 {
+	return finfo.size
+}
+
+func (finfo *fsInfo) Mode() fs.FileMode {
+	return finfo.mode
+}
+
+func (finfo *fsInfo) ModTime() time.Time {
+	return finfo.modTime
+}
+
+func (finfo *fsInfo) IsDir() bool {
+	return finfo.isDir
+}
+
+func (finfo *fsInfo) Sys() any {
+	return finfo.sys
 }

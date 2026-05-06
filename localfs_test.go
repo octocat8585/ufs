@@ -14,6 +14,11 @@
 
 package ufs
 
-type memFS struct {
-	// TODO: Implement FS interface
+import (
+	"testing"
+)
+
+func TestLocalFS(t *testing.T) {
+	dir := mustTemp(t)
+	testFileSystem(t, newLocalFS, dir)
 }
