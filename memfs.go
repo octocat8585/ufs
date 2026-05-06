@@ -14,6 +14,366 @@
 
 package ufs
 
+import (
+	"bytes"
+	"errors"
+	"io"
+	"io/fs"
+	"path"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+)
+
+var (
+	_ File = (*memFile)(nil)
+	_ FS   = (*memFS)(nil)
+)
+
 type memFS struct {
-	// TODO: Implement FS interface
+	mu   sync.RWMutex
+	root string
+	ents ents
+}
+
+type ent struct {
+	name    string
+	content []byte
+	mode    fs.FileMode
+	modTime time.Time
+}
+
+type ents map[string]*ent
+
+type memFile struct {
+	name      string
+	content   []byte
+	offset    int64
+	mode      fs.FileMode
+	modTime   time.Time
+	mu        sync.Mutex
+	fsys      *memFS
+	dirOffset int
+}
+
+func (f *memFile) Stat() (fs.FileInfo, error) {
+	return &fsInfo{
+		name:    path.Base(f.name),
+		size:    int64(len(f.content)),
+		mode:    f.mode,
+		modTime: f.modTime,
+		isDir:   f.mode.IsDir(),
+		sys:     nil,
+	}, nil
+}
+
+func (f *memFile) Read(p []byte) (int, error) {
+	if len(f.content) == 0 {
+		return 0, io.EOF
+	}
+	if f.offset >= int64(len(f.content)) {
+		return 0, io.EOF
+	}
+	n := copy(p, f.content[f.offset:])
+	f.offset += int64(n)
+	return n, nil
+}
+
+func (f *memFile) ReadAt(p []byte, off int64) (int, error) {
+	if off >= int64(len(f.content)) {
+		return 0, io.EOF
+	}
+	n := copy(p, f.content[off:])
+	if off+int64(n) >= int64(len(f.content)) {
+		return n, io.EOF
+	}
+	return n, nil
+}
+
+func (f *memFile) Write(p []byte) (int, error) {
+	return f.WriteString(string(p))
+}
+
+func (f *memFile) WriteString(s string) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.content = append(f.content, s...)
+	f.modTime = time.Now()
+
+	// Sync back to the filesystem
+	if f.fsys != nil && !f.mode.IsDir() {
+		f.fsys.mu.Lock()
+		if e, ok := f.fsys.ents[f.name]; ok {
+			e.content = bytes.Clone(f.content)
+			e.modTime = f.modTime
+		}
+		f.fsys.mu.Unlock()
+	}
+
+	return len(s), nil
+}
+
+func (f *memFile) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case io.SeekStart:
+		f.offset = offset
+	case io.SeekCurrent:
+		f.offset += offset
+	case io.SeekEnd:
+		f.offset = int64(len(f.content)) + offset
+	default:
+		return 0, errors.New("invalid whence")
+	}
+	if f.offset < 0 {
+		f.offset = 0
+		return 0, errors.New("negative offset")
+	}
+	return f.offset, nil
+}
+
+func (f *memFile) Close() error {
+	return nil
+}
+
+func (f *memFile) Readdir(n int) ([]fs.FileInfo, error) {
+	if !f.mode.IsDir() {
+		return nil, &fs.PathError{Op: "readdir", Path: f.name, Err: fs.ErrInvalid}
+	}
+	if f.fsys == nil {
+		return nil, &fs.PathError{Op: "readdir", Path: f.name, Err: fs.ErrInvalid}
+	}
+
+	fsys := f.fsys
+	fsys.mu.RLock()
+	defer fsys.mu.RUnlock()
+
+	prefix := ""
+	if f.name != "." {
+		prefix = f.name
+		if !strings.HasSuffix(prefix, "/") {
+			prefix = prefix + "/"
+		}
+	}
+
+	// Collect all unique child names
+	seen := make(map[string]bool)
+	var childNames []string
+	for key := range fsys.ents {
+		if key == "." {
+			continue
+		}
+		if strings.HasPrefix(key, prefix) {
+			remainder := strings.TrimPrefix(key, prefix)
+			slashIdx := strings.Index(remainder, "/")
+			var childName string
+			if slashIdx == -1 {
+				childName = remainder
+			} else {
+				childName = remainder[:slashIdx]
+			}
+			if childName != "" && !seen[childName] {
+				seen[childName] = true
+				childNames = append(childNames, childName)
+			}
+		}
+	}
+	sort.Strings(childNames)
+
+	// Build file info for each child
+	all := make([]fs.FileInfo, 0, len(childNames))
+	for _, childName := range childNames {
+		e := fsys.ents[prefix+childName]
+		if e == nil {
+			e = fsys.ents[prefix+childName+"/"]
+		}
+		if e != nil {
+			all = append(all, &fsInfo{
+				name:    e.name,
+				size:    int64(len(e.content)),
+				mode:    e.mode,
+				modTime: e.modTime,
+				isDir:   e.mode.IsDir(),
+				sys:     nil,
+			})
+		}
+	}
+
+	// Handle exhaustion
+	if f.dirOffset >= len(all) {
+		if n > 0 {
+			return nil, io.EOF
+		}
+		return nil, nil
+	}
+
+	// Determine how many entries to return
+	if n > 0 {
+		end := f.dirOffset + n
+		if end > len(all) {
+			end = len(all)
+		}
+		batch := all[f.dirOffset:end]
+		f.dirOffset = end
+		return batch, nil
+	}
+
+	// n <= 0: return all remaining
+	batch := all[f.dirOffset:]
+	f.dirOffset = len(all)
+	return batch, nil
+}
+
+func (f *memFile) ReadDir(n int) ([]fs.DirEntry, error) {
+	if !f.mode.IsDir() {
+		return nil, &fs.PathError{Op: "readdirent", Path: f.name, Err: fs.ErrInvalid}
+	}
+	infos, err := f.Readdir(n)
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]fs.DirEntry, 0, len(infos))
+	for _, info := range infos {
+		entries = append(entries, fs.FileInfoToDirEntry(info))
+	}
+	return entries, nil
+}
+
+func (fsys *memFS) Open(name string) (fs.File, error) {
+	// Handle root directory
+	if name == "." {
+		return &memFile{
+			name:    ".",
+			content: nil,
+			mode:    fs.ModeDir,
+			modTime: time.Now(),
+			fsys:    fsys,
+		}, nil
+	}
+	if err := validPath("open", name); err != nil {
+		return nil, err
+	}
+	fsys.mu.RLock()
+	defer fsys.mu.RUnlock()
+
+	e, err := fsys.findEnt(name)
+	if err != nil {
+		return nil, err
+	}
+	content := bytes.Clone(e.content)
+	return &memFile{
+		name:    name,
+		content: content,
+		mode:    e.mode,
+		modTime: e.modTime,
+		fsys:    fsys,
+	}, nil
+}
+
+func (fsys *memFS) Close() error {
+	return nil
+}
+
+func (fsys *memFS) Create(name string) (File, error) {
+	if err := validPath("create", name); err != nil {
+		return nil, err
+	}
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+
+	now := time.Now()
+	fsys.ents[name] = &ent{
+		name:    path.Base(name),
+		content: nil,
+		mode:    fs.ModePerm,
+		modTime: now,
+	}
+	// Ensure parent dirs exist
+	parent := path.Dir(name)
+	if parent != "." {
+		fsys.ensureParent(parent, now)
+	}
+	return &memFile{
+		name:    name,
+		content: nil,
+		mode:    fs.ModePerm,
+		modTime: now,
+		fsys:    fsys,
+	}, nil
+}
+
+func (fsys *memFS) MkdirAll(name string, perm fs.FileMode) error {
+	if err := validPath("mkdir", name); err != nil {
+		return err
+	}
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+
+	full := name
+	if !strings.HasSuffix(full, "/") {
+		full = full + "/"
+	}
+	parts := strings.Split(strings.Trim(full, "/"), "/")
+	accum := ""
+	now := time.Now()
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		accum += part + "/"
+		if _, ok := fsys.ents[accum]; !ok {
+			fsys.ents[accum] = &ent{
+				name:    part,
+				content: nil,
+				mode:    fs.ModeDir | perm,
+				modTime: now,
+			}
+		}
+	}
+	return nil
+}
+
+func (fsys *memFS) findEnt(name string) (*ent, error) {
+	e, ok := fsys.ents[name]
+	if ok {
+		return e, nil
+	}
+	// Try with trailing slash for directories
+	slashName := name + "/"
+	e, ok = fsys.ents[slashName]
+	if ok {
+		return e, nil
+	}
+	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+}
+
+func (fsys *memFS) ensureParent(dir string, now time.Time) {
+	full := dir
+	if !strings.HasSuffix(full, "/") {
+		full = full + "/"
+	}
+	parts := strings.Split(strings.Trim(full, "/"), "/")
+	accum := ""
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		accum += part + "/"
+		if _, ok := fsys.ents[accum]; !ok {
+			fsys.ents[accum] = &ent{
+				name:    part,
+				content: nil,
+				mode:    fs.ModeDir | fs.ModePerm,
+				modTime: now,
+			}
+		}
+	}
+}
+
+func newMemFS(name string) (FS, error) {
+	return &memFS{
+		root: strings.TrimPrefix(name, "mem://"),
+		ents: ents{},
+	}, nil
 }
