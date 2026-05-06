@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/fs"
 	"runtime"
+	"strings"
 )
 
 func validPath(op string, name string) error {
@@ -29,4 +30,8 @@ func validPath(op string, name string) error {
 		}
 	}
 	return nil
+}
+
+func coerceUnix(path string) string {
+	return strings.ReplaceAll(path, "\\", "/")
 }

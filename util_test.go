@@ -50,3 +50,27 @@ func TestValidPath(t *testing.T) {
 		})
 	}
 }
+
+func TestCoerceUnix(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		input string
+		want  string
+	}{
+		{input: ".", want: "."},
+		{input: "\\", want: "/"},
+		{input: "/", want: "/"},
+		{input: "\\abc\\", want: "/abc/"},
+		{input: "abc", want: "abc"},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+			got := coerceUnix(tc.input)
+
+			if got != tc.want {
+				t.Errorf("got: %q, want: %q", got, tc.want)
+			}
+		})
+	}
+}
