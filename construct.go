@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package ufs is a virtual system library for Go. It allows go applications to mount different storage systems represented as file systems to be used in applications.
 package ufs
 
 import (
