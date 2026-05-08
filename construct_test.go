@@ -15,10 +15,20 @@
 package ufs
 
 import (
-	"testing"
-
+	"io/fs"
 	"reflect"
+	"testing"
 )
+
+func TestNewBaseFSInvalid(t *testing.T) {
+	_, err := newBaseFS("unknown://surely-not-a-path-xyz")
+	if err == nil {
+		t.Error("newBaseFS(unknown://) succeeded, want error")
+	}
+	if _, ok := err.(*fs.PathError); !ok {
+		t.Errorf("newBaseFS(unknown://) returned %T, want *fs.PathError", err)
+	}
+}
 
 func TestNewBaseFS(t *testing.T) {
 	tests := []struct {

@@ -17,13 +17,16 @@ package ufs
 import (
 	"io"
 	"io/fs"
-	"strings"
 	"time"
 )
 
 var (
-	_ File = (*nullFile)(nil)
-	_ FS   = (*nullFS)(nil)
+	_ File          = (*nullFile)(nil)
+	_ FS            = (*nullFS)(nil)
+	_ fs.ReadFileFS = (*nullFS)(nil)
+	_ fs.ReadDirFS  = (*nullFS)(nil)
+	_ fs.ReadLinkFS = (*nullFS)(nil)
+	_ fs.GlobFS     = (*nullFS)(nil)
 )
 
 type nullFile struct {
@@ -31,7 +34,7 @@ type nullFile struct {
 }
 
 func (n *nullFile) Stat() (fs.FileInfo, error) {
-	isDir := n.name == "" || strings.HasSuffix(n.name, "/")
+	isDir := isDirName(n.name)
 	mode := fs.ModePerm
 	if isDir {
 		mode = fs.ModeDir | fs.ModePerm
@@ -100,6 +103,38 @@ func (fsys *nullFS) Create(name string) (File, error) {
 
 func (fsys *nullFS) MkdirAll(name string, perm fs.FileMode) error {
 	return nil
+}
+
+func (fsys *nullFS) ReadFile(name string) ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (fsys *nullFS) ReadLink(name string) (string, error) {
+	return "", nil
+}
+
+func (fsys *nullFS) Lstat(name string) (fs.FileInfo, error) {
+	isDir := isDirName(name)
+	mode := fs.ModePerm
+	if isDir {
+		mode = fs.ModeDir | fs.ModePerm
+	}
+	return &fsInfo{
+		name:    name,
+		size:    0,
+		mode:    mode,
+		modTime: time.Time{},
+		isDir:   isDir,
+		sys:     nil,
+	}, nil
+}
+
+func (fsys *nullFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	return []fs.DirEntry{}, nil
+}
+
+func (fsys *nullFS) Glob(pattern string) ([]string, error) {
+	return []string{}, nil
 }
 
 func newNullFS(name string) (FS, error) {

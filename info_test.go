@@ -15,9 +15,41 @@
 package ufs
 
 import (
+	"io/fs"
 	"testing"
 	"time"
 )
+
+func TestInfoDir(t *testing.T) {
+	tNow := mustTime("2026-01-01T00:00:00Z")
+	sysVal := struct{ x int }{x: 42}
+	info := &fsInfo{
+		name:    "mydir",
+		size:    4096,
+		mode:    fs.ModeDir | fs.ModePerm,
+		modTime: tNow,
+		isDir:   true,
+		sys:     sysVal,
+	}
+	if info.Name() != "mydir" {
+		t.Errorf("Name() = %q, want %q", info.Name(), "mydir")
+	}
+	if info.Size() != 4096 {
+		t.Errorf("Size() = %d, want 4096", info.Size())
+	}
+	if info.Mode() != fs.ModeDir|fs.ModePerm {
+		t.Errorf("Mode() = %v, want %v", info.Mode(), fs.ModeDir|fs.ModePerm)
+	}
+	if info.ModTime() != tNow {
+		t.Errorf("ModTime() = %v, want %v", info.ModTime(), tNow)
+	}
+	if !info.IsDir() {
+		t.Error("IsDir() = false, want true")
+	}
+	if info.Sys() != sysVal {
+		t.Errorf("Sys() = %v, want %v", info.Sys(), sysVal)
+	}
+}
 
 func TestInfo(t *testing.T) {
 	tNow := time.Now()

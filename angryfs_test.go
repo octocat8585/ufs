@@ -58,6 +58,61 @@ func TestAngryFSOpen(t *testing.T) {
 	}
 }
 
+func TestAngryFSClose(t *testing.T) {
+	fsys, err := newAngryFS("angry://")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.Close(); err != fs.ErrInvalid {
+		t.Errorf("Close() = %v, want %v", err, fs.ErrInvalid)
+	}
+}
+
+func TestAngryFSMkdirAll(t *testing.T) {
+	fsys, err := newAngryFS("angry://")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.MkdirAll("dir", fs.ModePerm); err != fs.ErrInvalid {
+		t.Errorf("MkdirAll() = %v, want %v", err, fs.ErrInvalid)
+	}
+}
+
+func TestAngryFSReadFile(t *testing.T) {
+	afs := &angryFS{}
+	if _, err := afs.ReadFile("foo.txt"); err != fs.ErrInvalid {
+		t.Errorf("ReadFile() = %v, want %v", err, fs.ErrInvalid)
+	}
+}
+
+func TestAngryFSReadLink(t *testing.T) {
+	afs := &angryFS{}
+	if _, err := afs.ReadLink("foo.txt"); err != fs.ErrInvalid {
+		t.Errorf("ReadLink() = %v, want %v", err, fs.ErrInvalid)
+	}
+}
+
+func TestAngryFSLstat(t *testing.T) {
+	afs := &angryFS{}
+	if _, err := afs.Lstat("foo.txt"); err != fs.ErrInvalid {
+		t.Errorf("Lstat() = %v, want %v", err, fs.ErrInvalid)
+	}
+}
+
+func TestAngryFSReadDir(t *testing.T) {
+	afs := &angryFS{}
+	if _, err := afs.ReadDir("dir"); err != fs.ErrInvalid {
+		t.Errorf("ReadDir() = %v, want %v", err, fs.ErrInvalid)
+	}
+}
+
+func TestAngryFSGlob(t *testing.T) {
+	afs := &angryFS{}
+	if _, err := afs.Glob("*.txt"); err != fs.ErrInvalid {
+		t.Errorf("Glob() = %v, want %v", err, fs.ErrInvalid)
+	}
+}
+
 func TestAngryFSCreate(t *testing.T) {
 	fsys, err := newAngryFS("angry://")
 	if err != nil {
