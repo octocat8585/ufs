@@ -59,6 +59,14 @@ func (fsys *tempMountFS) Lstat(name string) (fs.FileInfo, error) {
 	return fsys.lfs.Lstat(name)
 }
 
+func (fsys *tempMountFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	return fsys.lfs.ReadDir(name)
+}
+
+func (fsys *tempMountFS) Glob(pattern string) ([]string, error) {
+	return globFS(fsys, pattern)
+}
+
 func newTempMountFS(name string, prepare func(string) error) (FS, error) {
 	tempDir, cleanup, err := createOSTempDirectory()
 	if err != nil {

@@ -168,15 +168,8 @@ func (f *memFile) Readdir(n int) ([]fs.FileInfo, error) {
 		if key == "." {
 			continue
 		}
-		if strings.HasPrefix(key, prefix) {
-			remainder := strings.TrimPrefix(key, prefix)
-			slashIdx := strings.Index(remainder, "/")
-			var childName string
-			if slashIdx == -1 {
-				childName = remainder
-			} else {
-				childName = remainder[:slashIdx]
-			}
+		if remainder, ok := strings.CutPrefix(key, prefix); ok {
+			childName, _, _ := strings.Cut(remainder, "/")
 			if childName != "" && !seen[childName] {
 				seen[childName] = true
 				childNames = append(childNames, childName)
@@ -214,10 +207,7 @@ func (f *memFile) Readdir(n int) ([]fs.FileInfo, error) {
 
 	// Determine how many entries to return
 	if n > 0 {
-		end := f.dirOffset + n
-		if end > len(all) {
-			end = len(all)
-		}
+		end := min(f.dirOffset+n, len(all))
 		batch := all[f.dirOffset:end]
 		f.dirOffset = end
 		return batch, nil

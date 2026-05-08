@@ -20,8 +20,12 @@ import (
 )
 
 var (
-	_ FS           = (*nestFS)(nil)
-	_ fs.ReadDirFS = (*nestFS)(nil)
+	_ FS            = (*nestFS)(nil)
+	_ fs.ReadDirFS  = (*nestFS)(nil)
+	_ fs.ReadFileFS = (*nestFS)(nil)
+	_ fs.ReadLinkFS = (*nestFS)(nil)
+	_ fs.GlobFS     = (*nestFS)(nil)
+	_ fs.StatFS     = (*nestFS)(nil)
 )
 
 // nestFS is a wrapper for a base FS that supports automatic mounting of archives.
@@ -88,6 +92,34 @@ func (fsys *nestFS) Stat(name string) (fs.FileInfo, error) {
 	}
 	defer f.Close()
 	return f.Stat()
+}
+
+func (fsys *nestFS) ReadFile(name string) ([]byte, error) {
+	if cFsys, ok := fsys.fsys.(fs.ReadFileFS); ok {
+		return cFsys.ReadFile(name)
+	}
+	return fs.ReadFile(fsys.fsys, name)
+}
+
+func (fsys *nestFS) ReadLink(name string) (string, error) {
+	if cFsys, ok := fsys.fsys.(fs.ReadLinkFS); ok {
+		return cFsys.ReadLink(name)
+	}
+	return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrInvalid}
+}
+
+func (fsys *nestFS) Lstat(name string) (fs.FileInfo, error) {
+	if cFsys, ok := fsys.fsys.(fs.ReadLinkFS); ok {
+		return cFsys.Lstat(name)
+	}
+	return fsys.Stat(name)
+}
+
+func (fsys *nestFS) Glob(pattern string) ([]string, error) {
+	if cFsys, ok := fsys.fsys.(fs.GlobFS); ok {
+		return cFsys.Glob(pattern)
+	}
+	return globFS(fsys, pattern)
 }
 
 func newNestFS(name string) (FS, error) {

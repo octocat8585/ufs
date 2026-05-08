@@ -35,6 +35,9 @@ func newBaseFS(name string) (FS, error) {
 	if strings.HasPrefix(name, "file://") {
 		return newLocalFS(name)
 	}
+	if strings.HasPrefix(name, "gs://") {
+		return newGCSFS(name)
+	}
 
 	stat, err := os.Stat(name)
 	if err == nil && stat != nil {
