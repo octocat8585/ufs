@@ -45,12 +45,12 @@ func (fsys *nestFS) Create(name string) (File, error) {
 		return nil, err
 	}
 
-	// TODO: 
+	// TODO:
 	return fsys.fsys.Create(name)
 }
 
 func (fsys *nestFS) MkdirAll(name string, perm fs.FileMode) error {
-	// TODO: 
+	// TODO:
 	return fsys.fsys.MkdirAll(name, perm)
 }
 
