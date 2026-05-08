@@ -102,18 +102,30 @@ func (fsys *nullFS) Create(name string) (File, error) {
 }
 
 func (fsys *nullFS) MkdirAll(name string, perm fs.FileMode) error {
+	if err := validPath("mkdir", name); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (fsys *nullFS) ReadFile(name string) ([]byte, error) {
+	if err := validPath("readfile", name); err != nil {
+		return nil, err
+	}
 	return []byte{}, nil
 }
 
 func (fsys *nullFS) ReadLink(name string) (string, error) {
-	return "", nil
+	if err := validPath("readlink", name); err != nil {
+		return "", err
+	}
+	return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrInvalid}
 }
 
 func (fsys *nullFS) Lstat(name string) (fs.FileInfo, error) {
+	if err := validPath("lstat", name); err != nil {
+		return nil, err
+	}
 	isDir := isDirName(name)
 	mode := fs.ModePerm
 	if isDir {
@@ -130,6 +142,9 @@ func (fsys *nullFS) Lstat(name string) (fs.FileInfo, error) {
 }
 
 func (fsys *nullFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if err := validPath("readdir", name); err != nil {
+		return nil, err
+	}
 	return []fs.DirEntry{}, nil
 }
 

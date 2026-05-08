@@ -33,8 +33,11 @@ import (
 )
 
 var (
-	_ FS   = (*gcsFS)(nil)
-	_ File = (*gcsFile)(nil)
+	_ FS            = (*gcsFS)(nil)
+	_ fs.ReadFileFS = (*gcsFS)(nil)
+	_ fs.ReadDirFS  = (*gcsFS)(nil)
+	_ fs.ReadLinkFS = (*gcsFS)(nil)
+	_ File          = (*gcsFile)(nil)
 )
 
 const (
@@ -163,10 +166,7 @@ func (f *gcsFile) ReadDir(n int) ([]fs.DirEntry, error) {
 		f.dirOffset = len(all)
 		return result, nil
 	}
-	end := f.dirOffset + n
-	if end > len(all) {
-		end = len(all)
-	}
+	end := min(f.dirOffset+n, len(all))
 	result := all[f.dirOffset:end]
 	f.dirOffset = end
 	return result, nil
@@ -337,6 +337,62 @@ func (fsys *gcsFS) Create(name string) (File, error) {
 func (fsys *gcsFS) MkdirAll(name string, perm fs.FileMode) error {
 	// GCS has no real directories; virtual directories emerge from object prefixes.
 	return nil
+}
+
+func (fsys *gcsFS) ReadFile(name string) ([]byte, error) {
+	if err := validPath("readfile", name); err != nil {
+		return nil, err
+	}
+	f, err := fsys.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	gf := f.(*gcsFile)
+	if gf.isDir {
+		return nil, &fs.PathError{Op: "readfile", Path: name, Err: fs.ErrInvalid}
+	}
+	return gf.content, nil
+}
+
+func (fsys *gcsFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if name != "." {
+		if err := validPath("readdir", name); err != nil {
+			return nil, err
+		}
+	}
+	f, err := fsys.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	gf := f.(*gcsFile)
+	if !gf.isDir {
+		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrInvalid}
+	}
+	return gf.ReadDir(-1)
+}
+
+func (fsys *gcsFS) ReadLink(name string) (string, error) {
+	if err := validPath("readlink", name); err != nil {
+		return "", err
+	}
+	// GCS has no symlinks.
+	return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrInvalid}
+}
+
+func (fsys *gcsFS) Lstat(name string) (fs.FileInfo, error) {
+	if name != "." {
+		if err := validPath("lstat", name); err != nil {
+			return nil, err
+		}
+	}
+	f, err := fsys.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return f.Stat()
 }
 
 func newGCSFS(name string) (FS, error) {

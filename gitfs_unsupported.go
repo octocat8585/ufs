@@ -21,7 +21,7 @@ import (
 	"fmt"
 )
 
-func newGitFS(name string) (*localFS, error) {
+func newGitFS(name string) (FS, error) {
 	return nil, fmt.Errorf("cannot mount %q, gitfs is not supported on this operating system", name)
 }
 
