@@ -42,7 +42,7 @@ func TestNewBaseFS(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			uri:      "angryfs://",
+			uri:      "angry://",
 			wantType: reflect.TypeFor[*nullFS]().Name(),
 			wantErr:  false,
 		},
@@ -57,12 +57,12 @@ func TestNewBaseFS(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			uri:      "mem://",
+			uri:      "memory://",
 			wantType: reflect.TypeFor[*memFS]().Name(),
 			wantErr:  false,
 		},
 		{
-			uri:      "memfs://",
+			uri:      "memory://",
 			wantType: reflect.TypeFor[*memFS]().Name(),
 			wantErr:  false,
 		},
@@ -72,7 +72,7 @@ func TestNewBaseFS(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			uri:      "nullfs://",
+			uri:      "null://",
 			wantType: reflect.TypeFor[*nullFS]().Name(),
 			wantErr:  false,
 		},

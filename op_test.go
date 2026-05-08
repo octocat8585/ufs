@@ -26,7 +26,7 @@ import (
 // setupListFS creates a memFS with: a.txt, dir/b.txt, dir/c.txt.
 func setupListFS(t *testing.T) FS {
 	t.Helper()
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,8 +47,8 @@ func setupListFS(t *testing.T) FS {
 // --- Copy ---
 
 func TestCopy(t *testing.T) {
-	src, _ := newMemFS("mem://src")
-	dst, _ := newMemFS("mem://dst")
+	src, _ := newMemFS("memory://src")
+	dst, _ := newMemFS("memory://dst")
 	defer src.Close()
 	defer dst.Close()
 
@@ -76,7 +76,7 @@ func TestCopy(t *testing.T) {
 
 func TestCopyOpenError(t *testing.T) {
 	src, _ := newAngryFS("angry://")
-	dst, _ := newMemFS("mem://dst")
+	dst, _ := newMemFS("memory://dst")
 	defer dst.Close()
 
 	if err := Copy(src, "file.txt", dst, "file.txt"); err == nil {
@@ -85,7 +85,7 @@ func TestCopyOpenError(t *testing.T) {
 }
 
 func TestCopyCreateError(t *testing.T) {
-	src, _ := newMemFS("mem://src")
+	src, _ := newMemFS("memory://src")
 	defer src.Close()
 	f, _ := src.Create("file.txt")
 	f.WriteString("data")
@@ -151,7 +151,7 @@ func (lf *listFilenamesFS) ListFilenames(_ string) ([]string, error) {
 }
 
 func TestListFilesInterface(t *testing.T) {
-	inner, _ := newMemFS("mem://test")
+	inner, _ := newMemFS("memory://test")
 	defer inner.Close()
 	want := []string{"fast.txt", "path.txt"}
 	fsys := &listFilenamesFS{FS: inner, files: want}
@@ -200,7 +200,7 @@ func (f *forEachFilenameFS) ForEachFilename(_ string, fn func(string) error) err
 }
 
 func TestForEachFilenameInterface(t *testing.T) {
-	inner, _ := newMemFS("mem://test")
+	inner, _ := newMemFS("memory://test")
 	defer inner.Close()
 	want := []string{"fast.txt", "path.txt"}
 	fsys := &forEachFilenameFS{FS: inner, files: want}
@@ -271,7 +271,7 @@ func (f *forEachFileInfoFS) ForEachFileInfo(_ string, fn func(fs.FileInfo) error
 }
 
 func TestForEachFileInfoInterface(t *testing.T) {
-	inner, _ := newMemFS("mem://test")
+	inner, _ := newMemFS("memory://test")
 	defer inner.Close()
 	wantInfos := []fs.FileInfo{
 		&fsInfo{name: "fast.txt", size: 10, mode: fs.ModePerm},
