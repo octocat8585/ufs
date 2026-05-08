@@ -21,7 +21,7 @@ import (
 )
 
 func TestNewNestFS(t *testing.T) {
-	fsys, err := newNestFS("memfs://")
+	fsys, err := newNestFS("memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestNewNestFSInvalid(t *testing.T) {
 }
 
 func TestNestFSOpenInvalidPath(t *testing.T) {
-	fsys, err := newNestFS("memfs://")
+	fsys, err := newNestFS("memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestNestFSOpenInvalidPath(t *testing.T) {
 }
 
 func TestNestFSCreateInvalidPath(t *testing.T) {
-	fsys, err := newNestFS("memfs://")
+	fsys, err := newNestFS("memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestNestFSCreateInvalidPath(t *testing.T) {
 }
 
 func TestNestFSReadDir(t *testing.T) {
-	fsys, err := newNestFS("memfs://")
+	fsys, err := newNestFS("memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestNestFSReadDir(t *testing.T) {
 }
 
 func TestNestFSReadDirOnFile(t *testing.T) {
-	fsys, err := newNestFS("memfs://")
+	fsys, err := newNestFS("memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestNestFSReadDirOnFile(t *testing.T) {
 }
 
 func TestNestFSStat(t *testing.T) {
-	fsys, err := newNestFS("memfs://")
+	fsys, err := newNestFS("memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,11 +159,11 @@ func TestNestFSStat(t *testing.T) {
 }
 
 func TestNestFS(t *testing.T) {
-	testFileSystem(t, newNestFS, "memfs://")
+	testFileSystem(t, newNestFS, "memory://")
 }
 
 func TestNestFSOpenInvalid(t *testing.T) {
-	fsys, err := newNestFS("memfs://")
+	fsys, err := newNestFS("memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestNestFSOpenInvalid(t *testing.T) {
 }
 
 func TestNestFSCreateInvalid(t *testing.T) {
-	fsys, err := newNestFS("memfs://")
+	fsys, err := newNestFS("memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestNestFSCreateInvalid(t *testing.T) {
 }
 
 func TestNestFSClose(t *testing.T) {
-	fsys, err := newNestFS("memfs://")
+	fsys, err := newNestFS("memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestNestFSClose(t *testing.T) {
 }
 
 func TestNestFSMkdirAll(t *testing.T) {
-	fsys, err := newNestFS("memfs://")
+	fsys, err := newNestFS("memory://")
 	if err != nil {
 		t.Fatal(err)
 	}

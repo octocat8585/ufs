@@ -21,7 +21,7 @@ import (
 )
 
 func TestNewMemFS(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,11 +31,11 @@ func TestNewMemFS(t *testing.T) {
 }
 
 func TestMemFS(t *testing.T) {
-	testFileSystem(t, newMemFS, "mem://test")
+	testFileSystem(t, newMemFS, "memory://test")
 }
 
 func TestMemFSOpenInvalid(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestMemFSOpenInvalid(t *testing.T) {
 }
 
 func TestMemFSCreate(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestMemFSCreate(t *testing.T) {
 }
 
 func TestMemFileOperations(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestMemFileOperations(t *testing.T) {
 }
 
 func TestMemFileSeek(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestMemFileSeek(t *testing.T) {
 }
 
 func TestMemFileReadAt(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +270,7 @@ func TestMemFileReadAt(t *testing.T) {
 }
 
 func TestMemFSDirectory(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +314,7 @@ func TestMemFSDirectory(t *testing.T) {
 }
 
 func TestMemFSFilePersistence(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +347,7 @@ func TestMemFSFilePersistence(t *testing.T) {
 }
 
 func TestMemFSReadFile(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,7 +385,7 @@ func TestMemFSReadFile(t *testing.T) {
 }
 
 func TestMemFSReadLink(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -414,7 +414,7 @@ func TestMemFSReadLink(t *testing.T) {
 }
 
 func TestMemFSLstat(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,7 +478,7 @@ func TestMemFSLstat(t *testing.T) {
 }
 
 func TestMemFSReadDir(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -532,7 +532,7 @@ func TestMemFSReadDir(t *testing.T) {
 }
 
 func TestMemFSGlob(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -582,7 +582,7 @@ func TestMemFSGlob(t *testing.T) {
 }
 
 func TestMemFSReaddirAll(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -613,7 +613,7 @@ func TestMemFSReaddirAll(t *testing.T) {
 }
 
 func TestMemFSReaddirPaginated(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -648,7 +648,7 @@ func TestMemFSReaddirPaginated(t *testing.T) {
 }
 
 func TestMemFileReadDirOnFile(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -664,7 +664,7 @@ func TestMemFileReadDirOnFile(t *testing.T) {
 }
 
 func TestMemFileSeekNegative(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -680,7 +680,7 @@ func TestMemFileSeekNegative(t *testing.T) {
 }
 
 func TestMemFSMkdirAllInvalid(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -690,7 +690,7 @@ func TestMemFSMkdirAllInvalid(t *testing.T) {
 }
 
 func TestMemFSClose(t *testing.T) {
-	fsys, err := newMemFS("mem://test")
+	fsys, err := newMemFS("memory://test")
 	if err != nil {
 		t.Fatal(err)
 	}

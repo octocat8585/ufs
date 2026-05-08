@@ -455,7 +455,7 @@ func (fsys *memFS) Glob(pattern string) ([]string, error) {
 
 func newMemFS(name string) (FS, error) {
 	return &memFS{
-		root: strings.TrimPrefix(name, "mem://"),
+		root: strings.TrimPrefix(name, "memory://"),
 		dir:  memNodeMap{},
 	}, nil
 }

@@ -23,13 +23,13 @@ import (
 )
 
 func newBaseFS(name string) (FS, error) {
-	if strings.HasPrefix(name, "memfs://") || strings.HasPrefix(name, "mem://") {
+	if strings.HasPrefix(name, "memory://") {
 		return newMemFS(name)
 	}
-	if strings.HasPrefix(name, "angryfs://") || strings.HasPrefix(name, "angry://") {
+	if strings.HasPrefix(name, "angry://") {
 		return newAngryFS(name)
 	}
-	if strings.HasPrefix(name, "nullfs://") || strings.HasPrefix(name, "null://") {
+	if strings.HasPrefix(name, "null://") {
 		return newNullFS(name)
 	}
 	if strings.HasPrefix(name, "file://") {
