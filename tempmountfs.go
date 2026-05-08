@@ -71,7 +71,14 @@ func newTempMountFS(name string, prepare func(string) error) (FS, error) {
 		return nil, fmt.Errorf("cannot prepare temp directory %s, %w", name, err)
 	}
 
+	lfs, err := newLocalFS(tempDir)
+	if err != nil {
+		cleanup()
+		return nil, fmt.Errorf("cannot create local fs for temp directory %s, %w", name, err)
+	}
+
 	return &tempMountFS{
+		lfs:    lfs.(*localFS),
 		closer: cleanup,
 	}, nil
 }
