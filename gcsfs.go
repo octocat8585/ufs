@@ -327,9 +327,9 @@ func (fsys *gcsFS) Create(name string) (File, error) {
 	w.ChunkSize = minChunkSize
 
 	return &gcsFile{
-		name:  name,
-		isDir: false,
-		fsys:  fsys,
+		name:   name,
+		isDir:  false,
+		fsys:   fsys,
 		writer: w,
 	}, nil
 }
