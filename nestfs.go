@@ -21,7 +21,6 @@ import (
 
 var (
 	_ FS           = (*nestFS)(nil)
-	_ FS           = (*nestFS)(nil)
 	_ fs.ReadDirFS = (*nestFS)(nil)
 )
 
@@ -89,14 +88,6 @@ func (fsys *nestFS) Stat(name string) (fs.FileInfo, error) {
 	}
 	defer f.Close()
 	return f.Stat()
-}
-
-func (fsys *nestFS) Read(data []byte) (int, error) {
-	if cFsys, ok := fsys.fsys.(fs.File); ok {
-		return cFsys.Read(data)
-	}
-
-	return 0, nil
 }
 
 func newNestFS(name string) (FS, error) {

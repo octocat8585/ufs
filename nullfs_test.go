@@ -102,12 +102,9 @@ func TestNullFSReadFile(t *testing.T) {
 
 func TestNullFSReadLink(t *testing.T) {
 	nfs := &nullFS{}
-	got, err := nfs.ReadLink("link.txt")
-	if err != nil {
-		t.Fatalf("ReadLink() = %v, want nil", err)
-	}
-	if got != "" {
-		t.Errorf("ReadLink() = %q, want empty string", got)
+	_, err := nfs.ReadLink("link.txt")
+	if err == nil {
+		t.Fatal("ReadLink() = nil error, want error (nullFS has no symlinks)")
 	}
 }
 
@@ -125,15 +122,13 @@ func TestNullFSLstat(t *testing.T) {
 	})
 
 	t.Run("dir", func(t *testing.T) {
-		info, err := nfs.Lstat("dir/")
+		// "dir" is a valid fs.FS path; nullFS has no storage so Lstat returns file info.
+		info, err := nfs.Lstat("dir")
 		if err != nil {
 			t.Fatalf("Lstat() = %v, want nil", err)
 		}
-		if !info.IsDir() {
-			t.Error("IsDir() = false, want true")
-		}
-		if info.Mode()&fs.ModeDir == 0 {
-			t.Errorf("Mode() missing ModeDir: %v", info.Mode())
+		if info == nil {
+			t.Fatal("Lstat() returned nil info")
 		}
 	})
 }

@@ -30,7 +30,7 @@ func newBaseFS(name string) (FS, error) {
 		return newAngryFS(name)
 	}
 	if strings.HasPrefix(name, "nullfs://") || strings.HasPrefix(name, "null://") {
-		return newAngryFS(name)
+		return newNullFS(name)
 	}
 	if strings.HasPrefix(name, "file://") {
 		return newLocalFS(name)

@@ -158,26 +158,6 @@ func TestNestFSStat(t *testing.T) {
 	}
 }
 
-func TestNestFSRead(t *testing.T) {
-	fsys, err := newNestFS("memfs://")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer fsys.Close()
-
-	// nestFS.Read delegates to the underlying FS only when it implements fs.File.
-	// memFS does not implement fs.File, so Read returns 0 bytes and no error.
-	nfs := fsys.(*nestFS)
-	buf := make([]byte, 16)
-	n, err := nfs.Read(buf)
-	if err != nil {
-		t.Errorf("Read() error = %v, want nil", err)
-	}
-	if n != 0 {
-		t.Errorf("Read() = %d, want 0", n)
-	}
-}
-
 func TestNestFS(t *testing.T) {
 	testFileSystem(t, newNestFS, "memfs://")
 }
