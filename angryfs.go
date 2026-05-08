@@ -19,7 +19,11 @@ import (
 )
 
 var (
-	_ FS = (*angryFS)(nil)
+	_ FS            = (*angryFS)(nil)
+	_ fs.ReadFileFS = (*angryFS)(nil)
+	_ fs.ReadDirFS  = (*angryFS)(nil)
+	_ fs.ReadLinkFS = (*angryFS)(nil)
+	_ fs.GlobFS     = (*angryFS)(nil)
 
 	errAngry = fs.ErrInvalid
 )
@@ -48,6 +52,26 @@ func (fsys *angryFS) Create(name string) (File, error) {
 
 func (fsys *angryFS) MkdirAll(name string, perm fs.FileMode) error {
 	return errAngry
+}
+
+func (fsys *angryFS) ReadFile(name string) ([]byte, error) {
+	return nil, errAngry
+}
+
+func (fsys *angryFS) ReadLink(name string) (string, error) {
+	return "", errAngry
+}
+
+func (fsys *angryFS) Lstat(name string) (fs.FileInfo, error) {
+	return nil, errAngry
+}
+
+func (fsys *angryFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	return nil, errAngry
+}
+
+func (fsys *angryFS) Glob(pattern string) ([]string, error) {
+	return nil, errAngry
 }
 
 func newAngryFS(name string) (FS, error) {

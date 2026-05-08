@@ -346,6 +346,114 @@ func TestMemFSFilePersistence(t *testing.T) {
 	}
 }
 
+func TestMemFSReaddirAll(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.MkdirAll("parent", fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"a.txt", "b.txt"} {
+		f, err := fsys.Create("parent/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+	}
+
+	dir, err := fsys.Open("parent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+
+	entries, err := dir.(*memFile).Readdir(-1)
+	if err != nil {
+		t.Fatalf("Readdir(-1) = %v, want nil", err)
+	}
+	if len(entries) != 2 {
+		t.Errorf("Readdir(-1) = %d entries, want 2", len(entries))
+	}
+}
+
+func TestMemFSReaddirPaginated(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.MkdirAll("paged", fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"a.txt", "b.txt", "c.txt"} {
+		f, err := fsys.Create("paged/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+	}
+
+	dir, err := fsys.Open("paged")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+	mf := dir.(*memFile)
+
+	for i := range 3 {
+		e, err := mf.Readdir(1)
+		if err != nil || len(e) != 1 {
+			t.Fatalf("Readdir(1) call %d: got %d entries, err=%v", i+1, len(e), err)
+		}
+	}
+	// Exhausted: next call with n>0 must return io.EOF
+	if _, err := mf.Readdir(1); err != io.EOF {
+		t.Errorf("Readdir(1) after exhaustion = %v, want io.EOF", err)
+	}
+}
+
+func TestMemFileReadDirOnFile(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := fsys.Create("regular.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	if _, err := f.(*memFile).ReadDir(0); err == nil {
+		t.Error("ReadDir on a regular file succeeded, want error")
+	}
+}
+
+func TestMemFileSeekNegative(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := fsys.Create("neg.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	if _, err := f.Seek(-1, io.SeekStart); err == nil {
+		t.Error("Seek(-1, SeekStart) succeeded, want error")
+	}
+}
+
+func TestMemFSMkdirAllInvalid(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.MkdirAll("invalid/../path", fs.ModePerm); err == nil {
+		t.Error("MkdirAll(invalid/../path) succeeded, want error")
+	}
+}
+
 func TestMemFSClose(t *testing.T) {
 	fsys, err := newMemFS("mem://test")
 	if err != nil {
