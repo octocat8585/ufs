@@ -22,8 +22,12 @@ import (
 )
 
 var (
-	_ File = (*os.File)(nil)
-	_ FS   = (*localFS)(nil)
+	_ File          = (*os.File)(nil)
+	_ FS            = (*localFS)(nil)
+	_ fs.ReadFileFS = (*localFS)(nil)
+	//_ fs.ReadDirFS  = (*localFS)(nil)
+	_ fs.ReadLinkFS = (*localFS)(nil)
+	//_ fs.GlobFS     = (*localFS)(nil)
 )
 
 type localFS struct {
@@ -51,6 +55,21 @@ func (fsys *localFS) Create(name string) (File, error) {
 
 func (fsys *localFS) MkdirAll(name string, perm fs.FileMode) error {
 	return fsys.osFS.MkdirAll(name, perm)
+}
+
+func (fsys *localFS) ReadFile(name string) ([]byte, error) {
+	if err := validPath("readfile", name); err != nil {
+		return nil, err
+	}
+	return fsys.osFS.ReadFile(name)
+}
+
+func (fsys *localFS) ReadLink(name string) (string, error) {
+	return fsys.osFS.Readlink(name)
+}
+
+func (fsys *localFS) Lstat(name string) (fs.FileInfo, error) {
+	return fsys.osFS.Lstat(name)
 }
 
 func newLocalFS(name string) (FS, error) {

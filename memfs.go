@@ -27,8 +27,12 @@ import (
 )
 
 var (
-	_ File = (*memFile)(nil)
-	_ FS   = (*memFS)(nil)
+	_ File          = (*memFile)(nil)
+	_ FS            = (*memFS)(nil)
+	_ fs.ReadFileFS = (*memFS)(nil)
+	_ fs.ReadDirFS  = (*memFS)(nil)
+	_ fs.ReadLinkFS = (*memFS)(nil)
+	_ fs.GlobFS     = (*memFS)(nil)
 )
 
 type memFS struct {
@@ -369,6 +373,94 @@ func (fsys *memFS) ensureParent(dir string, now time.Time) {
 			}
 		}
 	}
+}
+func (fsys *memFS) ReadFile(name string) ([]byte, error) {
+	if err := validPath("readfile", name); err != nil {
+		return nil, err
+	}
+	fsys.mu.RLock()
+	defer fsys.mu.RUnlock()
+	e, err := fsys.findEnt(name)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.Clone(e.content), nil
+}
+
+func (fsys *memFS) ReadLink(name string) (string, error) {
+	if err := validPath("readlink", name); err != nil {
+		return "", err
+	}
+	fsys.mu.RLock()
+	defer fsys.mu.RUnlock()
+	if _, err := fsys.findEnt(name); err != nil {
+		return "", err
+	}
+	// memFS has no symlinks; every extant path is a regular file or directory.
+	return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrInvalid}
+}
+
+func (fsys *memFS) Lstat(name string) (fs.FileInfo, error) {
+	// Root directory is never stored in the map.
+	if name == "." {
+		return &fsInfo{name: ".", mode: fs.ModeDir, isDir: true}, nil
+	}
+	if err := validPath("lstat", name); err != nil {
+		return nil, err
+	}
+	fsys.mu.RLock()
+	defer fsys.mu.RUnlock()
+	e, err := fsys.findEnt(name)
+	if err != nil {
+		return nil, err
+	}
+	return &fsInfo{
+		name:    e.name,
+		size:    int64(len(e.content)),
+		mode:    e.mode,
+		modTime: e.modTime,
+		isDir:   e.mode.IsDir(),
+	}, nil
+}
+
+func (fsys *memFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	f, err := fsys.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	mf := f.(*memFile)
+	if !mf.mode.IsDir() {
+		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrInvalid}
+	}
+	return mf.ReadDir(-1)
+}
+
+func (fsys *memFS) Glob(pattern string) ([]string, error) {
+	if _, err := path.Match(pattern, ""); err != nil {
+		return nil, err
+	}
+	fsys.mu.RLock()
+	defer fsys.mu.RUnlock()
+
+	seen := make(map[string]bool)
+	var matches []string
+	for key := range fsys.dir {
+		name := strings.TrimSuffix(key, "/")
+		if seen[name] {
+			continue
+		}
+		matched, err := path.Match(pattern, name)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			seen[name] = true
+			matches = append(matches, name)
+		}
+	}
+	sort.Strings(matches)
+	return matches, nil
 }
 
 func newMemFS(name string) (FS, error) {

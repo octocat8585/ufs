@@ -35,3 +35,7 @@ func validPath(op string, name string) error {
 func coerceUnix(path string) string {
 	return strings.ReplaceAll(path, "\\", "/")
 }
+
+func isDirName(name string) bool {
+	return name == "" || strings.HasSuffix(name, "/")
+}

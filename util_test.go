@@ -15,9 +15,34 @@
 package ufs
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
+
+func TestIsDirName(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		input string
+		want  bool
+	}{
+		{input: "", want: true},
+		{input: "/", want: true},
+		{input: "dir/", want: true},
+		{input: "a/b/c/", want: true},
+		{input: "file.txt", want: false},
+		{input: "dir/file.txt", want: false},
+		{input: ".", want: false},
+	}
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%q", tc.input), func(t *testing.T) {
+			t.Parallel()
+			if got := isDirName(tc.input); got != tc.want {
+				t.Errorf("isDirName(%q) = %v, want %v", tc.input, got, tc.want)
+			}
+		})
+	}
+}
 
 func TestValidPath(t *testing.T) {
 	t.Parallel()

@@ -346,6 +346,349 @@ func TestMemFSFilePersistence(t *testing.T) {
 	}
 }
 
+func TestMemFSReadFile(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f, err := fsys.Create("hello.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString("hello world")
+	f.Close()
+
+	rfs := fsys.(fs.ReadFileFS)
+
+	t.Run("valid", func(t *testing.T) {
+		got, err := rfs.ReadFile("hello.txt")
+		if err != nil {
+			t.Fatalf("ReadFile() = %v, want nil", err)
+		}
+		if string(got) != "hello world" {
+			t.Errorf("ReadFile() = %q, want %q", got, "hello world")
+		}
+	})
+
+	t.Run("not_found", func(t *testing.T) {
+		if _, err := rfs.ReadFile("missing.txt"); err == nil {
+			t.Error("ReadFile(missing) succeeded, want error")
+		}
+	})
+
+	t.Run("invalid_path", func(t *testing.T) {
+		if _, err := rfs.ReadFile("../escape.txt"); err == nil {
+			t.Error("ReadFile(../escape.txt) succeeded, want error")
+		}
+	})
+}
+
+func TestMemFSReadLink(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, _ := fsys.Create("file.txt")
+	f.Close()
+
+	lfs := fsys.(fs.ReadLinkFS)
+
+	t.Run("existing_file_not_a_symlink", func(t *testing.T) {
+		if _, err := lfs.ReadLink("file.txt"); err == nil {
+			t.Error("ReadLink on regular file succeeded, want error")
+		}
+	})
+
+	t.Run("not_found", func(t *testing.T) {
+		if _, err := lfs.ReadLink("missing.txt"); err == nil {
+			t.Error("ReadLink(missing) succeeded, want error")
+		}
+	})
+
+	t.Run("invalid_path", func(t *testing.T) {
+		if _, err := lfs.ReadLink("../escape.txt"); err == nil {
+			t.Error("ReadLink(../escape) succeeded, want error")
+		}
+	})
+}
+
+func TestMemFSLstat(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fsys.MkdirAll("mydir", fs.ModePerm)
+	f, _ := fsys.Create("mydir/file.txt")
+	f.WriteString("data")
+	f.Close()
+
+	lfs := fsys.(fs.ReadLinkFS)
+
+	t.Run("regular_file", func(t *testing.T) {
+		info, err := lfs.Lstat("mydir/file.txt")
+		if err != nil {
+			t.Fatalf("Lstat() = %v, want nil", err)
+		}
+		if info.Name() != "file.txt" {
+			t.Errorf("Name() = %q, want %q", info.Name(), "file.txt")
+		}
+		if info.Size() != 4 {
+			t.Errorf("Size() = %d, want 4", info.Size())
+		}
+		if info.IsDir() {
+			t.Error("IsDir() = true, want false")
+		}
+	})
+
+	t.Run("directory", func(t *testing.T) {
+		info, err := lfs.Lstat("mydir")
+		if err != nil {
+			t.Fatalf("Lstat() = %v, want nil", err)
+		}
+		if !info.IsDir() {
+			t.Error("IsDir() = false, want true for directory")
+		}
+		if info.Mode()&fs.ModeDir == 0 {
+			t.Errorf("Mode() missing ModeDir: %v", info.Mode())
+		}
+	})
+
+	t.Run("root", func(t *testing.T) {
+		info, err := lfs.Lstat(".")
+		if err != nil {
+			t.Fatalf("Lstat(.) = %v, want nil", err)
+		}
+		if !info.IsDir() {
+			t.Error("IsDir() = false, want true for root")
+		}
+	})
+
+	t.Run("not_found", func(t *testing.T) {
+		if _, err := lfs.Lstat("missing.txt"); err == nil {
+			t.Error("Lstat(missing) succeeded, want error")
+		}
+	})
+
+	t.Run("invalid_path", func(t *testing.T) {
+		if _, err := lfs.Lstat("../escape"); err == nil {
+			t.Error("Lstat(../escape) succeeded, want error")
+		}
+	})
+}
+
+func TestMemFSReadDir(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fsys.MkdirAll("docs", fs.ModePerm)
+	for _, name := range []string{"a.txt", "b.txt"} {
+		f, _ := fsys.Create("docs/" + name)
+		f.Close()
+	}
+
+	dfs := fsys.(fs.ReadDirFS)
+
+	t.Run("populated_dir", func(t *testing.T) {
+		entries, err := dfs.ReadDir("docs")
+		if err != nil {
+			t.Fatalf("ReadDir() = %v, want nil", err)
+		}
+		if len(entries) != 2 {
+			t.Errorf("ReadDir() = %d entries, want 2", len(entries))
+		}
+	})
+
+	t.Run("root", func(t *testing.T) {
+		entries, err := dfs.ReadDir(".")
+		if err != nil {
+			t.Fatalf("ReadDir(.) = %v, want nil", err)
+		}
+		if len(entries) == 0 {
+			t.Error("ReadDir(.) returned 0 entries, want at least 1")
+		}
+	})
+
+	t.Run("on_file", func(t *testing.T) {
+		f, _ := fsys.Create("plain.txt")
+		f.Close()
+		if _, err := dfs.ReadDir("plain.txt"); err == nil {
+			t.Error("ReadDir on a file succeeded, want error")
+		}
+	})
+
+	t.Run("not_found", func(t *testing.T) {
+		if _, err := dfs.ReadDir("missing"); err == nil {
+			t.Error("ReadDir(missing) succeeded, want error")
+		}
+	})
+
+	t.Run("invalid_path", func(t *testing.T) {
+		if _, err := dfs.ReadDir("../escape"); err == nil {
+			t.Error("ReadDir(../escape) succeeded, want error")
+		}
+	})
+}
+
+func TestMemFSGlob(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fsys.MkdirAll("src", fs.ModePerm)
+	for _, name := range []string{"src/foo.go", "src/bar.go", "src/README.md"} {
+		f, _ := fsys.Create(name)
+		f.Close()
+	}
+
+	gfs := fsys.(fs.GlobFS)
+
+	t.Run("match_go_files", func(t *testing.T) {
+		matches, err := gfs.Glob("src/*.go")
+		if err != nil {
+			t.Fatalf("Glob() = %v, want nil", err)
+		}
+		if len(matches) != 2 {
+			t.Errorf("Glob(src/*.go) = %v, want 2 matches", matches)
+		}
+	})
+
+	t.Run("match_all_in_src", func(t *testing.T) {
+		matches, err := gfs.Glob("src/*")
+		if err != nil {
+			t.Fatalf("Glob() = %v, want nil", err)
+		}
+		if len(matches) != 3 {
+			t.Errorf("Glob(src/*) = %v, want 3 matches", matches)
+		}
+	})
+
+	t.Run("no_match", func(t *testing.T) {
+		matches, err := gfs.Glob("src/*.xyz")
+		if err != nil {
+			t.Fatalf("Glob() = %v, want nil", err)
+		}
+		if len(matches) != 0 {
+			t.Errorf("Glob(src/*.xyz) = %v, want 0 matches", matches)
+		}
+	})
+
+	t.Run("invalid_pattern", func(t *testing.T) {
+		if _, err := gfs.Glob("[invalid"); err == nil {
+			t.Error("Glob([invalid) succeeded, want error")
+		}
+	})
+}
+
+func TestMemFSReaddirAll(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.MkdirAll("parent", fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"a.txt", "b.txt"} {
+		f, err := fsys.Create("parent/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+	}
+
+	dir, err := fsys.Open("parent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+
+	entries, err := dir.(*memFile).Readdir(-1)
+	if err != nil {
+		t.Fatalf("Readdir(-1) = %v, want nil", err)
+	}
+	if len(entries) != 2 {
+		t.Errorf("Readdir(-1) = %d entries, want 2", len(entries))
+	}
+}
+
+func TestMemFSReaddirPaginated(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.MkdirAll("paged", fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"a.txt", "b.txt", "c.txt"} {
+		f, err := fsys.Create("paged/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+	}
+
+	dir, err := fsys.Open("paged")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+	mf := dir.(*memFile)
+
+	for i := range 3 {
+		e, err := mf.Readdir(1)
+		if err != nil || len(e) != 1 {
+			t.Fatalf("Readdir(1) call %d: got %d entries, err=%v", i+1, len(e), err)
+		}
+	}
+	// Exhausted: next call with n>0 must return io.EOF
+	if _, err := mf.Readdir(1); err != io.EOF {
+		t.Errorf("Readdir(1) after exhaustion = %v, want io.EOF", err)
+	}
+}
+
+func TestMemFileReadDirOnFile(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := fsys.Create("regular.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	if _, err := f.(*memFile).ReadDir(0); err == nil {
+		t.Error("ReadDir on a regular file succeeded, want error")
+	}
+}
+
+func TestMemFileSeekNegative(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := fsys.Create("neg.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	if _, err := f.Seek(-1, io.SeekStart); err == nil {
+		t.Error("Seek(-1, SeekStart) succeeded, want error")
+	}
+}
+
+func TestMemFSMkdirAllInvalid(t *testing.T) {
+	fsys, err := newMemFS("mem://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.MkdirAll("invalid/../path", fs.ModePerm); err == nil {
+		t.Error("MkdirAll(invalid/../path) succeeded, want error")
+	}
+}
+
 func TestMemFSClose(t *testing.T) {
 	fsys, err := newMemFS("mem://test")
 	if err != nil {

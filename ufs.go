@@ -20,6 +20,14 @@ import (
 	"io/fs"
 )
 
+// ExFS provides extended functionality from the standard FS.
+type FSEx interface {
+	fs.ReadFileFS
+	fs.ReadDirFS
+	//fs.GlobFS
+	fs.ReadLinkFS
+}
+
 // ReadFile represents a read-only file.
 type ReadFile interface {
 	fs.File
