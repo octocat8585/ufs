@@ -20,6 +20,28 @@ import (
 	"testing"
 )
 
+func TestIsCwd(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		input string
+		want  bool
+	}{
+		{input: "", want: true},
+		{input: ".", want: true},
+		{input: "foo", want: false},
+		{input: "..", want: false},
+		{input: "foo/bar", want: false},
+	}
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%q", tc.input), func(t *testing.T) {
+			t.Parallel()
+			if got := isCwd(tc.input); got != tc.want {
+				t.Errorf("isCwd(%q) = %v, want %v", tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestIsDirName(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {

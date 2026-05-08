@@ -62,3 +62,21 @@ type FS interface {
 type FileInfo interface {
 	fs.FileInfo
 }
+
+// ListFilenames returns a list of filenames with reduced memory usage.
+type ListFilenames interface {
+	// ListFilenames returns a list of filenames with reduced memory usage.
+	ListFilenames(string) ([]string, error)
+}
+
+// ForEachFileInfoIter scans all fs.FileInfo with reduced memory usage.
+type ForEachFileInfoIter interface {
+	// ForEachFileInfo scans all fs.FileInfo with reduced memory usage.
+	ForEachFileInfo(dir string, f func(fs.FileInfo) error) error
+}
+
+// ForEachFilenameIter scans all file names with reduced memory usage.
+type ForEachFilenameIter interface {
+	// ForEachFilename scans all file names with reduced memory usage.
+	ForEachFilename(dir string, f func(string) error) error
+}
