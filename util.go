@@ -39,3 +39,7 @@ func coerceUnix(path string) string {
 func isDirName(name string) bool {
 	return name == "" || strings.HasSuffix(name, "/")
 }
+
+func isCwd(name string) bool {
+	return name == "" || name == "."
+}
