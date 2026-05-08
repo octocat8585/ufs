@@ -11,8 +11,8 @@ Unified File System (UFS) is a library that allows go apps to use the `fs.FS` in
 
 Storage | URI         | Implementation | Description
 ------- | ----------- | -------------- | -----------
-Null    | `null://` | nullfs.go      | Acts as `/dev/null`. Any files written to this location are forgotten. Reads always resolve to empty files. All directories are read with no contents.
-Memory  | `memory://`  | memfs.go       | Stores files with virtual memory of the application. Forgotten when the application stops.
+Null    | `null://`   | nullfs.go      | Acts as `/dev/null`. Any files written to this location are forgotten. Reads always resolve to empty files. All directories are read with no contents.
+Memory  | `memory://` | memfs.go       | Stores files with virtual memory of the application. Forgotten when the application stops.
 Local   | `file://`   | localfs.go     | Local files on the hard drive. The URI specifies the mount point of the local file system. Access to files outside of the mounted directory are not allowed. This is backed by Go's `os.RootFS`.
 
 ## Commands

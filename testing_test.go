@@ -148,3 +148,12 @@ func mustTime(s string) time.Time {
 	}
 	return val
 }
+
+func verifyReadOnlyFS(tb testing.TB, createFS func(testing.TB) ReadFS) {
+}
+
+func verifyFS(tb testing.TB, createFS func(testing.TB) FS) {
+	verifyReadOnlyFS(tb, func(iTB testing.TB) ReadFS {
+		return createFS(iTB)
+	})
+}
