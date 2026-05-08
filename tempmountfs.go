@@ -1,0 +1,84 @@
+// Copyright 2026 Jeremy Edwards
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package ufs
+
+import (
+	"fmt"
+	"io/fs"
+)
+
+var (
+	_ localFSInterface = (*tempMountFS)(nil)
+)
+
+type tempMountFS struct {
+	lfs    *localFS
+	closer func() error
+}
+
+func (fsys *tempMountFS) Open(name string) (fs.File, error) {
+	return fsys.lfs.Open(name)
+}
+
+func (fsys *tempMountFS) Close() error {
+	if err := fsys.lfs.Close(); err != nil {
+		return err
+	}
+	return fsys.closer()
+}
+
+func (fsys *tempMountFS) Create(name string) (File, error) {
+	return fsys.lfs.Create(name)
+}
+
+func (fsys *tempMountFS) MkdirAll(name string, perm fs.FileMode) error {
+	return fsys.lfs.MkdirAll(name, perm)
+}
+
+func (fsys *tempMountFS) ReadFile(name string) ([]byte, error) {
+	return fsys.lfs.ReadFile(name)
+}
+
+func (fsys *tempMountFS) ReadLink(name string) (string, error) {
+	return fsys.lfs.ReadLink(name)
+}
+
+func (fsys *tempMountFS) Lstat(name string) (fs.FileInfo, error) {
+	return fsys.lfs.Lstat(name)
+}
+
+func newTempMountFS(name string, prepare func(string) error) (FS, error) {
+	tempDir, cleanup, err := createOSTempDirectory()
+	if err != nil {
+		cleanup()
+		return nil, fmt.Errorf("cannot create temp directory, %w", err)
+	}
+
+	if err := prepare(tempDir); err != nil {
+		cleanup()
+		return nil, fmt.Errorf("cannot prepare temp directory %s, %w", name, err)
+	}
+
+	lfs, err := newLocalFS(tempDir)
+	if err != nil {
+		cleanup()
+		return nil, fmt.Errorf("cannot create local fs for temp directory %s, %w", name, err)
+	}
+
+	return &tempMountFS{
+		lfs:    lfs.(*localFS),
+		closer: cleanup,
+	}, nil
+}

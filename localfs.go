@@ -22,13 +22,17 @@ import (
 )
 
 var (
-	_ File          = (*os.File)(nil)
-	_ FS            = (*localFS)(nil)
-	_ fs.ReadFileFS = (*localFS)(nil)
-	//_ fs.ReadDirFS  = (*localFS)(nil)
-	_ fs.ReadLinkFS = (*localFS)(nil)
-	//_ fs.GlobFS     = (*localFS)(nil)
+	_ File             = (*os.File)(nil)
+	_ localFSInterface = (*localFS)(nil)
 )
+
+type localFSInterface interface {
+	FS
+	fs.ReadFileFS
+	fs.ReadLinkFS
+	// fs.ReadDirFS
+	// fs.GlobFS
+}
 
 type localFS struct {
 	osFS *os.Root
