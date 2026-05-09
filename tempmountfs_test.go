@@ -76,44 +76,6 @@ func TestTempMountFSPrepareError(t *testing.T) {
 	}
 }
 
-func TestTempMountFSOpenInvalid(t *testing.T) {
-	fsys, err := newTempMountFS("test://", func(string) error { return nil })
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer fsys.Close()
-
-	invalidPaths := []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-	for _, path := range invalidPaths {
-		if _, err := fsys.Open(path); err == nil {
-			t.Errorf("Open(%q) succeeded, want error", path)
-		}
-	}
-}
-
-func TestTempMountFSCreateInvalid(t *testing.T) {
-	fsys, err := newTempMountFS("test://", func(string) error { return nil })
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer fsys.Close()
-
-	invalidPaths := []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-	for _, path := range invalidPaths {
-		if _, err := fsys.Create(path); err == nil {
-			t.Errorf("Create(%q) succeeded, want error", path)
-		}
-	}
-}
-
 func TestTempMountFSReadFile(t *testing.T) {
 	fsys, err := newTempMountFS("test://", func(string) error { return nil })
 	if err != nil {

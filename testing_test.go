@@ -149,11 +149,129 @@ func mustTime(s string) time.Time {
 	return val
 }
 
-func verifyReadOnlyFS(tb testing.TB, createFS func(testing.TB) ReadFS) {
+var (
+	invalidPaths = []string{
+		"/absolute/path",
+		"../relative/path",
+		"invalid/../path",
+	}
+
+	fsTestCases = []struct {
+		name     string
+		createFS func(tb testing.TB) (FS, error)
+	}{
+		{
+			name: "localFS",
+			createFS: func(tb testing.TB) (FS, error) {
+				dir := mustTemp(tb)
+				return newLocalFS(dir)
+			},
+		},
+		{
+			name: "tempMountFS",
+			createFS: func(tb testing.TB) (FS, error) {
+				return newTempMountFS("test://", func(string) error { return nil })
+			},
+		},
+		{
+			name: "memFS",
+			createFS: func(tb testing.TB) (FS, error) {
+				return newMemFS("mem://")
+			},
+		},
+		{
+			name: "nestFS",
+			createFS: func(tb testing.TB) (FS, error) {
+				return newNestFS("memory://")
+			},
+		},
+	}
+
+	readOnlyFSTestCases = []struct {
+		name     string
+		createFS func(tb testing.TB) (FS, error)
+	}{
+		{
+			name: "nullFS",
+			createFS: func(tb testing.TB) (FS, error) {
+				return newNullFS("null://")
+			},
+		},
+	}
+)
+
+func verifyReadOnlyFS(t *testing.T, fsys fs.FS) {
+	t.Helper()
+
+	for _, path := range invalidPaths {
+		t.Run("OpenInvalid", func(t *testing.T) {
+			if _, err := fsys.Open(path); err == nil {
+				t.Errorf("Open(%q) succeeded, want error", path)
+			}
+		})
+	}
 }
 
-func verifyFS(tb testing.TB, createFS func(testing.TB) FS) {
-	verifyReadOnlyFS(tb, func(iTB testing.TB) ReadFS {
-		return createFS(iTB)
-	})
+func verifyFS(t *testing.T, fsys FS) {
+	verifyReadOnlyFS(t, fsys)
+
+	for _, path := range invalidPaths {
+		t.Run("CreateInvalid", func(t *testing.T) {
+			if _, err := fsys.Create(path); err == nil {
+				t.Errorf("Create(%q) succeeded, want error", path)
+			}
+		})
+	}
+}
+
+func TestReadOnlyFS(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range readOnlyFSTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fsys, err := tc.createFS(t)
+			if err != nil {
+				t.Fatalf("cannot create file system, %s", err)
+			}
+			if fsys == nil {
+				t.Fatalf("file sytem is nil")
+			}
+			defer func() {
+				if err := fsys.Close(); err != nil {
+					t.Errorf("second file system close() failed, %s", err)
+				}
+			}()
+			verifyReadOnlyFS(t, fsys)
+			if err := fsys.Close(); err != nil {
+				t.Errorf("file system failed to close without errors, %s", err)
+			}
+		})
+	}
+}
+
+func TestFS(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range fsTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fsys, err := tc.createFS(t)
+			if err != nil {
+				t.Fatalf("cannot create file system, %s", err)
+			}
+			if fsys == nil {
+				t.Fatalf("file sytem is nil")
+			}
+			defer func() {
+				if err := fsys.Close(); err != nil {
+					t.Errorf("second file system close() failed, %s", err)
+				}
+			}()
+			verifyFS(t, fsys)
+			if err := fsys.Close(); err != nil {
+				t.Errorf("file system failed to close without errors, %s", err)
+			}
+		})
+	}
 }
