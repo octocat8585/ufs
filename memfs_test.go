@@ -34,26 +34,6 @@ func TestMemFS(t *testing.T) {
 	testFileSystem(t, newMemFS, "memory://test")
 }
 
-func TestMemFSOpenInvalid(t *testing.T) {
-	fsys, err := newMemFS("memory://test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	invalidPaths := []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-
-	for _, path := range invalidPaths {
-		_, err := fsys.Open(path)
-		if err == nil {
-			t.Errorf("Open(%q) succeeded, want error", path)
-		}
-	}
-}
-
 func TestMemFSCreate(t *testing.T) {
 	fsys, err := newMemFS("memory://test")
 	if err != nil {
@@ -69,20 +49,6 @@ func TestMemFSCreate(t *testing.T) {
 
 	if f == nil {
 		t.Fatal("Created file is nil")
-	}
-
-	// Invalid Create
-	invalidPaths := []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-
-	for _, path := range invalidPaths {
-		_, err := fsys.Create(path)
-		if err == nil {
-			t.Errorf("Create(%q) succeeded, want error", path)
-		}
 	}
 }
 

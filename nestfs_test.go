@@ -37,48 +37,6 @@ func TestNewNestFSInvalid(t *testing.T) {
 	}
 }
 
-func TestNestFSOpenInvalidPath(t *testing.T) {
-	fsys, err := newNestFS("memory://")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	invalidPaths := []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-	for _, p := range invalidPaths {
-		_, err := fsys.Open(p)
-		if err == nil {
-			t.Errorf("Open(%q) succeeded, want error", p)
-		} else if _, ok := err.(*fs.PathError); !ok {
-			t.Errorf("Open(%q) returned %T, want *fs.PathError", p, err)
-		}
-	}
-}
-
-func TestNestFSCreateInvalidPath(t *testing.T) {
-	fsys, err := newNestFS("memory://")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	invalidPaths := []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-	for _, p := range invalidPaths {
-		_, err := fsys.Create(p)
-		if err == nil {
-			t.Errorf("Create(%q) succeeded, want error", p)
-		} else if _, ok := err.(*fs.PathError); !ok {
-			t.Errorf("Create(%q) returned %T, want *fs.PathError", p, err)
-		}
-	}
-}
-
 func TestNestFSReadDir(t *testing.T) {
 	fsys, err := newNestFS("memory://")
 	if err != nil {

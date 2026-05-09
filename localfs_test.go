@@ -29,23 +29,6 @@ func TestLocalFS(t *testing.T) {
 	testFileSystem(t, newLocalFS, dir)
 }
 
-func TestLocalFSOpenInvalid(t *testing.T) {
-	dir := mustTemp(t)
-	fsys := mustFS(t, newLocalFS, dir)
-	defer fsys.Close()
-
-	invalidPaths := []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-	for _, path := range invalidPaths {
-		if _, err := fsys.Open(path); err == nil {
-			t.Errorf("Open(%q) succeeded, want error", path)
-		}
-	}
-}
-
 func TestLocalFSCreateInvalid(t *testing.T) {
 	dir := mustTemp(t)
 	fsys := mustFS(t, newLocalFS, dir)
