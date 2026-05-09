@@ -40,6 +40,10 @@ type localFS struct {
 	osFS *os.Root
 }
 
+func (fsys *localFS) getAbsPath(name string) (string, error) {
+	return filepath.Abs(filepath.Join(fsys.osFS.Name(), name))
+}
+
 func (fsys *localFS) Open(name string) (fs.File, error) {
 	if err := validPath("open", name); err != nil {
 		return nil, err

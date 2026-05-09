@@ -15,9 +15,13 @@
 package ufs
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
+	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestNewNestFS(t *testing.T) {
@@ -34,6 +38,26 @@ func TestNewNestFSInvalid(t *testing.T) {
 	_, err := newNestFS("invalid://scheme")
 	if err == nil {
 		t.Fatal("newNestFS with invalid scheme should return an error")
+	}
+}
+
+func xTestNestFSFull(t *testing.T) {
+	fsys, err := newNestFS("/home/coder/project/hand/ufs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertContains(t, fsys, "testing/testassets/files/index.html", "testing/testassets/files/index.html")
+	assertContains(t, fsys, "testing/testassets/archives/nested-testassets.zip.d/site.js", "testing/testassets/files/site.js")
+	assertContains(t, fsys, "testing/testassets/archives/nested-testassets.zip.d/single-testassets.zip.d/index.html", "testing/testassets/files/index.html")
+}
+
+func assertContains(t *testing.T, fsys FS, name string, substr string) {
+	data, err := fs.ReadFile(fsys, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), substr) {
+		t.Errorf("%q does not contain %q, (len: %d) %q", name, substr, len(data), string(data))
 	}
 }
 
@@ -83,6 +107,89 @@ func TestNestFSReadDirOnFile(t *testing.T) {
 	_, err = nfs.ReadDir("regular.txt")
 	if err == nil {
 		t.Error("ReadDir on a regular file should return an error")
+	}
+}
+
+func TestGetPotentialArchives(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		input string
+		want  []string
+	}{
+		{
+			input: "",
+			want:  []string{},
+		},
+		{
+			input: ".",
+			want:  []string{},
+		},
+		{
+			input: "testing/testassets/files/index.html",
+			want:  []string{},
+		},
+		{
+			input: "testing/testassets/archives/nested-testassets.zip.d/site.js",
+			want:  []string{"testing/testassets/archives/nested-testassets.zip.d"},
+		},
+		{
+			input: "testing/testassets/archives/nested-testassets.zip.d/single-testassets.zip.d/index.html",
+			want:  []string{"testing/testassets/archives/nested-testassets.zip.d", "testing/testassets/archives/nested-testassets.zip.d/single-testassets.zip.d"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.input, func(t *testing.T) {
+			got := getPotentialArchives(tc.input)
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("got: %q, want: %q, diff: %q", got, tc.want, diff)
+			}
+		})
+	}
+}
+
+func TestRemovePathComponent(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name      string
+		mountPath string
+		want      string
+	}{
+		{
+			name:      "",
+			mountPath: "",
+			want:      "",
+		},
+		{
+			name:      "a/b/c",
+			mountPath: "a/b",
+			want:      "c",
+		},
+		{
+			name:      "a/b/c",
+			mountPath: "a/b/",
+			want:      "c",
+		},
+		{
+			name:      "a/b/c/",
+			mountPath: "a/b",
+			want:      "c/",
+		},
+		{
+			name:      "a/b/c/",
+			mountPath: "a/b/",
+			want:      "c/",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%s - %s", tc.name, tc.mountPath), func(t *testing.T) {
+			t.Parallel()
+			got := removePathComponent(tc.name, tc.mountPath)
+			if got != tc.want {
+				t.Errorf("got: %q, want: %q", got, tc.want)
+			}
+		})
 	}
 }
 

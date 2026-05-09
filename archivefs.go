@@ -15,8 +15,11 @@
 package ufs
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 
 	"github.com/mholt/archives"
@@ -80,7 +83,7 @@ func (fsys *archiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return fs.ReadDir(fsys.fsys, name)
 }
 
-func newArchiveFSFromLocalFS(ctx context.Context, name string) (FS, error) {
+func newArchiveFSFromLocalFS(ctx context.Context, name string) (*archiveFS, error) {
 	fsys, err := archives.FileSystem(ctx, name, nil)
 	if err != nil {
 		return nil, fmt.Errorf("cannot mount %q as archiveFS, %w", name, err)
@@ -88,4 +91,49 @@ func newArchiveFSFromLocalFS(ctx context.Context, name string) (FS, error) {
 	return &archiveFS{
 		fsys: fsys,
 	}, nil
+}
+
+func coerceToReaderAt(file fs.File) (io.ReaderAt, error) {
+	readerAt, ok := file.(io.ReaderAt)
+	if ok {
+		return readerAt, nil
+	} else {
+		// TODO: This is very inefficient because it's reading a nested zip file into memory.
+		data, err := io.ReadAll(file)
+		if err != nil {
+			return nil, err
+		}
+		return bytes.NewReader(data), err
+	}
+}
+
+func newArchiveFSFromFile(file fs.File) (*archiveFS, error) {
+	stat, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	readerAt, err := coerceToReaderAt(file)
+	if err != nil {
+		return nil, err
+	}
+	ctx := context.Background()
+	format, _, err := archives.Identify(ctx, stat.Name(), file)
+	if err != nil && !errors.Is(err, archives.NoMatch) {
+		return nil, err
+	}
+	if format != nil {
+		// TODO: we only really need Extractor and Decompressor here, not the combined interfaces...
+		if af, ok := format.(archives.Archival); ok {
+			r := io.NewSectionReader(readerAt, 0, stat.Size())
+			afs := archives.ArchiveFS{
+				Stream: r,
+				Format: af,
+			}
+			return &archiveFS{
+				fsys: afs,
+			}, nil
+		}
+	}
+	return nil, fmt.Errorf("archive not recognized")
 }
