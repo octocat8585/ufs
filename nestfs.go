@@ -116,7 +116,7 @@ func (fsys *nestFS) getFSAndSubpath(name string) (*nestFS, string, error) {
 }
 
 func (fsys *nestFS) Open(name string) (fs.File, error) {
-	if err := validPath("open", name); err != nil {
+	if err := fsys.validPath("open", name); err != nil {
 		return nil, err
 	}
 
@@ -129,11 +129,26 @@ func (fsys *nestFS) Open(name string) (fs.File, error) {
 }
 
 func (fsys *nestFS) Close() error {
-	return fsys.fsys.Close()
+	if fsys.fsMap != nil {
+		for mountPath, nfs := range fsys.fsMap {
+			if err := nfs.Close(); err != nil {
+				return fmt.Errorf("cannot close mount %q, %w", mountPath, err)
+			}
+		}
+		fsys.fsMap = nil
+	}
+
+	if fsys.fsys != nil {
+		if err := fsys.fsys.Close(); err != nil {
+			return fmt.Errorf("cannot close file system %q, %w", fsys.fsys, err)
+		}
+		fsys.fsys = nil
+	}
+	return nil
 }
 
 func (fsys *nestFS) Create(name string) (File, error) {
-	if err := validPath("create", name); err != nil {
+	if err := fsys.validPath("create", name); err != nil {
 		return nil, err
 	}
 
@@ -142,11 +157,18 @@ func (fsys *nestFS) Create(name string) (File, error) {
 }
 
 func (fsys *nestFS) MkdirAll(name string, perm fs.FileMode) error {
+	if err := fsys.validPath("mkdir", name); err != nil {
+		return err
+	}
 	// TODO:
 	return fsys.fsys.MkdirAll(name, perm)
 }
 
 func (fsys *nestFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if err := fsys.validPath("readdir", name); err != nil {
+		return nil, err
+	}
+
 	if cFsys, ok := fsys.fsys.(fs.ReadDirFS); ok {
 		return cFsys.ReadDir(name)
 	}
@@ -165,6 +187,10 @@ func (fsys *nestFS) ReadDir(name string) ([]fs.DirEntry, error) {
 }
 
 func (fsys *nestFS) Stat(name string) (fs.FileInfo, error) {
+	if err := fsys.validPath("stat", name); err != nil {
+		return nil, err
+	}
+
 	if cFsys, ok := fsys.fsys.(fs.StatFS); ok {
 		return cFsys.Stat(name)
 	}
@@ -177,6 +203,10 @@ func (fsys *nestFS) Stat(name string) (fs.FileInfo, error) {
 }
 
 func (fsys *nestFS) ReadFile(name string) ([]byte, error) {
+	if err := fsys.validPath("readfile", name); err != nil {
+		return nil, err
+	}
+
 	mountFS, subName, err := fsys.getFSAndSubpath(name)
 	if err != nil {
 		return nil, err
@@ -189,6 +219,9 @@ func (fsys *nestFS) ReadFile(name string) ([]byte, error) {
 }
 
 func (fsys *nestFS) ReadLink(name string) (string, error) {
+	if err := fsys.validPath("readlink", name); err != nil {
+		return "", err
+	}
 	if cFsys, ok := fsys.fsys.(fs.ReadLinkFS); ok {
 		return cFsys.ReadLink(name)
 	}
@@ -196,6 +229,10 @@ func (fsys *nestFS) ReadLink(name string) (string, error) {
 }
 
 func (fsys *nestFS) Lstat(name string) (fs.FileInfo, error) {
+	if err := fsys.validPath("lstat", name); err != nil {
+		return nil, err
+	}
+
 	if cFsys, ok := fsys.fsys.(fs.ReadLinkFS); ok {
 		return cFsys.Lstat(name)
 	}
@@ -207,6 +244,16 @@ func (fsys *nestFS) Glob(pattern string) ([]string, error) {
 		return cFsys.Glob(pattern)
 	}
 	return globFS(fsys, pattern)
+}
+
+func (fsys *nestFS) validPath(op string, name string) error {
+	if err := validPath(op, name); err != nil {
+		return err
+	}
+	if fsys.fsys == nil {
+		return fmt.Errorf("cannot %s %q, file system is closed", op, name)
+	}
+	return nil
 }
 
 func newNestFS(name string) (FS, error) {
