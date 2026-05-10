@@ -90,7 +90,7 @@ func TestNullFSMkdirAll(t *testing.T) {
 }
 
 func TestNullFSReadFile(t *testing.T) {
-	nfs := &nullFS{}
+	nfs := makeNullFS()
 	got, err := nfs.ReadFile("foo.txt")
 	if err != nil {
 		t.Fatalf("ReadFile() = %v, want nil", err)
@@ -101,7 +101,7 @@ func TestNullFSReadFile(t *testing.T) {
 }
 
 func TestNullFSReadLink(t *testing.T) {
-	nfs := &nullFS{}
+	nfs := makeNullFS()
 	_, err := nfs.ReadLink("link.txt")
 	if err == nil {
 		t.Fatal("ReadLink() = nil error, want error (nullFS has no symlinks)")
@@ -109,7 +109,7 @@ func TestNullFSReadLink(t *testing.T) {
 }
 
 func TestNullFSLstat(t *testing.T) {
-	nfs := &nullFS{}
+	nfs := makeNullFS()
 
 	t.Run("file", func(t *testing.T) {
 		info, err := nfs.Lstat("foo.txt")
@@ -134,7 +134,7 @@ func TestNullFSLstat(t *testing.T) {
 }
 
 func TestNullFSReadDir(t *testing.T) {
-	nfs := &nullFS{}
+	nfs := makeNullFS()
 	entries, err := nfs.ReadDir(".")
 	if err != nil {
 		t.Fatalf("ReadDir() = %v, want nil", err)
@@ -145,7 +145,7 @@ func TestNullFSReadDir(t *testing.T) {
 }
 
 func TestNullFSGlob(t *testing.T) {
-	nfs := &nullFS{}
+	nfs := makeNullFS()
 	matches, err := nfs.Glob("*.txt")
 	if err != nil {
 		t.Fatalf("Glob() = %v, want nil", err)

@@ -143,10 +143,10 @@ func (f *memFile) Close() error {
 
 func (f *memFile) Readdir(n int) ([]fs.FileInfo, error) {
 	if !f.mode.IsDir() {
-		return nil, &fs.PathError{Op: "readdir", Path: f.name, Err: fs.ErrInvalid}
+		return nil, pathError("readdir", f.name, fs.ErrInvalid)
 	}
 	if f.fsys == nil {
-		return nil, &fs.PathError{Op: "readdir", Path: f.name, Err: fs.ErrInvalid}
+		return nil, pathError("readdir", f.name, fs.ErrInvalid)
 	}
 
 	fsys := f.fsys
@@ -221,7 +221,7 @@ func (f *memFile) Readdir(n int) ([]fs.FileInfo, error) {
 
 func (f *memFile) ReadDir(n int) ([]fs.DirEntry, error) {
 	if !f.mode.IsDir() {
-		return nil, &fs.PathError{Op: "readdirent", Path: f.name, Err: fs.ErrInvalid}
+		return nil, pathError("readdirent", f.name, fs.ErrInvalid)
 	}
 	infos, err := f.Readdir(n)
 	if err != nil {
@@ -339,7 +339,7 @@ func (fsys *memFS) findEnt(name string) (*memNode, error) {
 	if ok {
 		return e, nil
 	}
-	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	return nil, pathError("open", name, fs.ErrNotExist)
 }
 
 func (fsys *memFS) ensureParent(dir string, now time.Time) {
@@ -387,7 +387,7 @@ func (fsys *memFS) ReadLink(name string) (string, error) {
 		return "", err
 	}
 	// memFS has no symlinks; every extant path is a regular file or directory.
-	return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrInvalid}
+	return "", pathError("readlink", name, fs.ErrInvalid)
 }
 
 func (fsys *memFS) Lstat(name string) (fs.FileInfo, error) {
@@ -421,7 +421,7 @@ func (fsys *memFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	defer f.Close()
 	mf := f.(*memFile)
 	if !mf.mode.IsDir() {
-		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrInvalid}
+		return nil, pathError("readdir", name, fs.ErrInvalid)
 	}
 	return mf.ReadDir(-1)
 }

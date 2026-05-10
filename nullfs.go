@@ -119,7 +119,7 @@ func (fsys *nullFS) ReadLink(name string) (string, error) {
 	if err := validPath("readlink", name); err != nil {
 		return "", err
 	}
-	return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrInvalid}
+	return "", pathError("readlink", name, fs.ErrInvalid)
 }
 
 func (fsys *nullFS) Lstat(name string) (fs.FileInfo, error) {
@@ -153,5 +153,9 @@ func (fsys *nullFS) Glob(pattern string) ([]string, error) {
 }
 
 func newNullFS(name string) (FS, error) {
-	return &nullFS{}, nil
+	return makeNullFS(), nil
+}
+
+func makeNullFS() *nullFS {
+	return &nullFS{}
 }

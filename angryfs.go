@@ -75,5 +75,9 @@ func (fsys *angryFS) Glob(pattern string) ([]string, error) {
 }
 
 func newAngryFS(name string) (FS, error) {
-	return &angryFS{}, nil
+	return makeAngryFS(), nil
+}
+
+func makeAngryFS() *angryFS {
+	return &angryFS{}
 }

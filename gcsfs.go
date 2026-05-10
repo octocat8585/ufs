@@ -82,7 +82,7 @@ func (f *gcsFile) Stat() (fs.FileInfo, error) {
 
 func (f *gcsFile) Read(p []byte) (int, error) {
 	if f.isDir {
-		return 0, &fs.PathError{Op: "read", Path: f.name, Err: fs.ErrInvalid}
+		return 0, pathError("read", f.name, fs.ErrInvalid)
 	}
 	if len(f.content) == 0 {
 		return 0, io.EOF
@@ -97,7 +97,7 @@ func (f *gcsFile) Read(p []byte) (int, error) {
 
 func (f *gcsFile) ReadAt(p []byte, off int64) (int, error) {
 	if f.isDir {
-		return 0, &fs.PathError{Op: "readat", Path: f.name, Err: fs.ErrInvalid}
+		return 0, pathError("readat", f.name, fs.ErrInvalid)
 	}
 	if off >= int64(len(f.content)) {
 		return 0, io.EOF
@@ -115,14 +115,14 @@ func (f *gcsFile) Write(p []byte) (int, error) {
 
 func (f *gcsFile) WriteString(s string) (int, error) {
 	if f.writer == nil {
-		return 0, &fs.PathError{Op: "write", Path: f.name, Err: fs.ErrInvalid}
+		return 0, pathError("write", f.name, fs.ErrInvalid)
 	}
 	return f.writer.Write([]byte(s))
 }
 
 func (f *gcsFile) Seek(offset int64, whence int) (int64, error) {
 	if f.isDir {
-		return 0, &fs.PathError{Op: "seek", Path: f.name, Err: fs.ErrInvalid}
+		return 0, pathError("seek", f.name, fs.ErrInvalid)
 	}
 	switch whence {
 	case io.SeekStart:
@@ -152,7 +152,7 @@ func (f *gcsFile) Close() error {
 
 func (f *gcsFile) ReadDir(n int) ([]fs.DirEntry, error) {
 	if !f.isDir {
-		return nil, &fs.PathError{Op: "readdirent", Path: f.name, Err: fs.ErrInvalid}
+		return nil, pathError("readdirent", f.name, fs.ErrInvalid)
 	}
 	all := f.dirEntries
 	if f.dirOffset >= len(all) {
@@ -174,7 +174,7 @@ func (f *gcsFile) ReadDir(n int) ([]fs.DirEntry, error) {
 
 func (f *gcsFile) Readdir(n int) ([]fs.FileInfo, error) {
 	if !f.isDir {
-		return nil, &fs.PathError{Op: "readdir", Path: f.name, Err: fs.ErrInvalid}
+		return nil, pathError("readdir", f.name, fs.ErrInvalid)
 	}
 	entries, err := f.ReadDir(n)
 	if err != nil {
@@ -195,7 +195,7 @@ func (fsys *gcsFS) Open(name string) (fs.File, error) {
 	if name == "." {
 		entries, err := fsys.listDir("")
 		if err != nil {
-			return nil, &fs.PathError{Op: "open", Path: ".", Err: err}
+			return nil, pathError("open", ".", err)
 		}
 		return &gcsFile{
 			name:       ".",
@@ -217,12 +217,12 @@ func (fsys *gcsFS) Open(name string) (fs.File, error) {
 	if err == nil {
 		rc, err := bkt.Object(objPath).NewReader(fsys.ctx)
 		if err != nil {
-			return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+			return nil, pathError("open", name, err)
 		}
 		content, err := io.ReadAll(rc)
 		rc.Close()
 		if err != nil {
-			return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+			return nil, pathError("open", name, err)
 		}
 		return &gcsFile{
 			name:    name,
@@ -234,16 +234,16 @@ func (fsys *gcsFS) Open(name string) (fs.File, error) {
 		}, nil
 	}
 	if !errors.Is(err, storage.ErrObjectNotExist) {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+		return nil, pathError("open", name, err)
 	}
 
 	// Not a file — check if it's a virtual directory (has objects under it).
 	entries, err := fsys.listDir(name)
 	if err != nil {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+		return nil, pathError("open", name, err)
 	}
 	if len(entries) == 0 {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+		return nil, pathError("open", name, fs.ErrNotExist)
 	}
 	return &gcsFile{
 		name:       name,
@@ -350,7 +350,7 @@ func (fsys *gcsFS) ReadFile(name string) ([]byte, error) {
 	defer f.Close()
 	gf := f.(*gcsFile)
 	if gf.isDir {
-		return nil, &fs.PathError{Op: "readfile", Path: name, Err: fs.ErrInvalid}
+		return nil, pathError("readfile", name, fs.ErrInvalid)
 	}
 	return gf.content, nil
 }
@@ -368,7 +368,7 @@ func (fsys *gcsFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	defer f.Close()
 	gf := f.(*gcsFile)
 	if !gf.isDir {
-		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrInvalid}
+		return nil, pathError("readdir", name, fs.ErrInvalid)
 	}
 	return gf.ReadDir(-1)
 }
@@ -378,7 +378,7 @@ func (fsys *gcsFS) ReadLink(name string) (string, error) {
 		return "", err
 	}
 	// GCS has no symlinks.
-	return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrInvalid}
+	return "", pathError("readlink", name, fs.ErrInvalid)
 }
 
 func (fsys *gcsFS) Lstat(name string) (fs.FileInfo, error) {
@@ -459,19 +459,11 @@ func parseGCSPath(path string, op string) (string, string, error) {
 	after, ok := strings.CutPrefix(path, "gs://")
 	if !ok {
 
-		return "", "", &fs.PathError{
-			Op:   op,
-			Path: path,
-			Err:  fmt.Errorf("'%s' does not contain the gs:// prefix", path),
-		}
+		return "", "", pathError(op, path, fmt.Errorf("'%s' does not contain the gs:// prefix", path))
 	}
 	parts := strings.SplitN(after, "/", 2)
 	if len(parts) == 0 || parts[0] == "" {
-		return "", "", &fs.PathError{
-			Op:   op,
-			Path: path,
-			Err:  fmt.Errorf("'%s' does not have a bucket name", path),
-		}
+		return "", "", pathError(op, path, fmt.Errorf("'%s' does not have a bucket name", path))
 	}
 	if len(parts) == 2 {
 		return parts[0], parts[1], nil
