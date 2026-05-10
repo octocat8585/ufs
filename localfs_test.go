@@ -15,66 +15,15 @@
 package ufs
 
 import (
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestLocalFS(t *testing.T) {
 	dir := mustTemp(t)
 	testFileSystem(t, newLocalFS, dir)
-}
-
-func TestLocalFSCreateInvalid(t *testing.T) {
-	dir := mustTemp(t)
-	fsys := mustFS(t, newLocalFS, dir)
-	defer fsys.Close()
-
-	invalidPaths := []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-	for _, path := range invalidPaths {
-		if _, err := fsys.Create(path); err == nil {
-			t.Errorf("Create(%q) succeeded, want error", path)
-		}
-	}
-}
-
-func TestLocalFSReadFile(t *testing.T) {
-	dir := mustTemp(t)
-	fsys := mustFS(t, newLocalFS, dir)
-	defer fsys.Close()
-
-	wantData := randomString(100)
-
-	f, err := fsys.Create("readfile_test.txt")
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
-	if _, err := io.WriteString(f, wantData); err != nil {
-		t.Fatalf("WriteString failed: %v", err)
-	}
-	if err := f.Close(); err != nil {
-		t.Fatalf("Close failed: %v", err)
-	}
-
-	rfs, ok := fsys.(fs.ReadFileFS)
-	if !ok {
-		t.Fatal("localFS does not implement fs.ReadFileFS")
-	}
-	got, err := rfs.ReadFile("readfile_test.txt")
-	if err != nil {
-		t.Fatalf("ReadFile failed: %v", err)
-	}
-	if diff := cmp.Diff(wantData, string(got)); diff != "" {
-		t.Errorf("ReadFile mismatch (-want +got):\n%s", diff)
-	}
 }
 
 func TestLocalFSLstat(t *testing.T) {

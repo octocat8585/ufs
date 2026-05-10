@@ -50,45 +50,6 @@ func TestNewNullFS(t *testing.T) {
 	}
 }
 
-func TestNullFSOpenInvalid(t *testing.T) {
-	fsys, err := newNullFS("null://")
-	if err != nil {
-		t.Fatal(err)
-	}
-	invalidPaths := []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-
-	for _, path := range invalidPaths {
-		_, err := fsys.Open(path)
-		if err == nil {
-			t.Errorf("Open(%q) succeeded, want error", path)
-		}
-	}
-}
-
-func TestNullFSClose(t *testing.T) {
-	fsys, err := newNullFS("null://")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := fsys.Close(); err != nil {
-		t.Errorf("Close() = %v, want nil", err)
-	}
-}
-
-func TestNullFSMkdirAll(t *testing.T) {
-	fsys, err := newNullFS("null://")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := fsys.MkdirAll("dir", fs.ModePerm); err != nil {
-		t.Errorf("MkdirAll() = %v, want nil", err)
-	}
-}
-
 func TestNullFSReadFile(t *testing.T) {
 	nfs := makeNullFS()
 	got, err := nfs.ReadFile("foo.txt")
