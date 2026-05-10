@@ -21,6 +21,14 @@ import (
 	"strings"
 )
 
+func New(name string) (FS, error) {
+	fsys, err := newBaseFS(name)
+	if err != nil {
+		return nil, err
+	}
+	return makeNestFS(fsys), nil
+}
+
 func newBaseFS(name string) (FS, error) {
 	if strings.HasPrefix(name, "memory://") {
 		return newMemFS(name)
