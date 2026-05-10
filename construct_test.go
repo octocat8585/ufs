@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"fmt"
 	"io/fs"
 	"reflect"
 	"testing"
@@ -30,7 +31,7 @@ func TestNewBaseFSInvalid(t *testing.T) {
 	}
 }
 
-func TestNewBaseFS(t *testing.T) {
+func TestNew(t *testing.T) {
 	tests := []struct {
 		uri      string
 		wantType string
@@ -78,7 +79,7 @@ func TestNewBaseFS(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.uri, func(t *testing.T) {
+		t.Run(fmt.Sprintf("newBaseFS(%q)", tt.uri), func(t *testing.T) {
 			got, err := newBaseFS(tt.uri)
 			if tt.wantErr {
 				if err == nil {
@@ -91,6 +92,28 @@ func TestNewBaseFS(t *testing.T) {
 					gotTypeName := reflect.TypeOf(got).Name()
 					if gotTypeName != tt.wantType {
 						t.Errorf("getBaseFS(%q) = %q, want %q", tt.uri, got, tt.wantType)
+					}
+				}
+			}
+		})
+		t.Run(fmt.Sprintf("New(%q)", tt.uri), func(t *testing.T) {
+			got, err := New(tt.uri)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("getBaseFS(%q) = %q, want error", tt.uri, got)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("getBaseFS(%q) = %q, want %q", tt.uri, err, tt.wantType)
+				} else {
+					gotAsNestFS, ok := got.(*nestFS)
+					if ok {
+						gotTypeName := reflect.TypeOf(gotAsNestFS.fsys).Name()
+						if gotTypeName != tt.wantType {
+							t.Errorf("getBaseFS(%q) = %q, want %q", tt.uri, got, tt.wantType)
+						}
+					} else {
+						t.Errorf("%q is not of type *nestFS", got)
 					}
 				}
 			}
