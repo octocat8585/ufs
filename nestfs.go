@@ -15,8 +15,12 @@
 package ufs
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 var (
@@ -28,10 +32,111 @@ var (
 	_ fs.StatFS     = (*nestFS)(nil)
 )
 
+func removePathComponent(name string, mountPath string) string {
+	return strings.TrimLeft(strings.TrimPrefix(name, mountPath), "\\/")
+}
+
+func getPotentialArchives(name string) []string {
+	components := strings.Split(name, string(os.PathSeparator))
+	potentials := []string{}
+	for idx, component := range components {
+		if strings.HasSuffix(component, ".d") {
+			potentials = append(potentials, filepath.Join(components[0:idx+1]...))
+		}
+	}
+	return potentials
+}
+
 // nestFS is a wrapper for a base FS that supports automatic mounting of archives.
 // This means that any archive can opened and read automatically. Archives are revealed via $filename.d name pattern.
 type nestFS struct {
-	fsys FS
+	fsys  FS
+	fsMap map[string]*nestFS
+}
+
+func (fsys *nestFS) mountArchive(name string) (*nestFS, error) {
+	ctx := context.Background()
+	lfs, ok := fsys.fsys.(*localFS)
+	var newFS *archiveFS
+	if ok {
+		absName, err := lfs.getAbsPath(name)
+		if err != nil {
+			return nil, &fs.PathError{
+				Op:   "mount",
+				Path: name,
+				Err:  err,
+			}
+		}
+		newFS, err = newArchiveFSFromLocalFS(ctx, absName)
+		if err != nil {
+			return nil, &fs.PathError{
+				Op:   "mount",
+				Path: name,
+				Err:  err,
+			}
+		}
+	} else {
+		f, err := fsys.Open(name)
+		if err != nil {
+			return nil, &fs.PathError{
+				Op:   "mount",
+				Path: name,
+				Err:  err,
+			}
+		}
+		newFS, err = newArchiveFSFromFile(f)
+		if err != nil {
+			return nil, &fs.PathError{
+				Op:   "mount",
+				Path: name,
+				Err:  err,
+			}
+		}
+	}
+
+	wrapped := createNestFS(newFS)
+	fsys.fsMap[name+".d"] = wrapped
+	return wrapped, nil
+}
+
+func (fsys *nestFS) getFSAndSubpath(name string) (*nestFS, string, error) {
+	targetFS := fsys
+	targetName := name
+	for mountPath, subFS := range fsys.fsMap {
+		subPath := removePathComponent(name, mountPath)
+		if len(subPath) < len(targetName) {
+			targetName = subPath
+			targetFS = subFS
+		}
+	}
+
+	archiveDirNames := getPotentialArchives(targetName)
+	for _, archiveDirName := range archiveDirNames {
+		archiveName := strings.TrimSuffix(archiveDirName, ".d")
+		info, err := targetFS.Stat(archiveName)
+		if info != nil && err == nil {
+			subPath := removePathComponent(targetName, archiveDirName)
+			subFS, err := targetFS.mountArchive(archiveName)
+			if err != nil {
+				return nil, "", &fs.PathError{
+					Op:   "mount",
+					Path: name,
+					Err:  fmt.Errorf("cannot mount archive %s, %w", archiveName, err),
+				}
+			}
+			targetFS, targetName, err := subFS.getFSAndSubpath(subPath)
+			if err != nil {
+				return nil, "", &fs.PathError{
+					Op:   "mount",
+					Path: name,
+					Err:  fmt.Errorf("cannot mount archive %s, %w", archiveName, err),
+				}
+			}
+			return targetFS, targetName, nil
+		}
+	}
+
+	return targetFS, targetName, nil
 }
 
 func (fsys *nestFS) Open(name string) (fs.File, error) {
@@ -39,7 +144,12 @@ func (fsys *nestFS) Open(name string) (fs.File, error) {
 		return nil, err
 	}
 
-	return fsys.fsys.Open(name)
+	mountFS, subName, err := fsys.getFSAndSubpath(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return mountFS.fsys.Open(subName)
 }
 
 func (fsys *nestFS) Close() error {
@@ -95,10 +205,15 @@ func (fsys *nestFS) Stat(name string) (fs.FileInfo, error) {
 }
 
 func (fsys *nestFS) ReadFile(name string) ([]byte, error) {
-	if cFsys, ok := fsys.fsys.(fs.ReadFileFS); ok {
-		return cFsys.ReadFile(name)
+	mountFS, subName, err := fsys.getFSAndSubpath(name)
+	if err != nil {
+		return nil, err
 	}
-	return fs.ReadFile(fsys.fsys, name)
+
+	if cFsys, ok := mountFS.fsys.(fs.ReadFileFS); ok {
+		return cFsys.ReadFile(subName)
+	}
+	return fs.ReadFile(mountFS.fsys, subName)
 }
 
 func (fsys *nestFS) ReadLink(name string) (string, error) {
@@ -127,7 +242,12 @@ func newNestFS(name string) (FS, error) {
 	if err != nil {
 		return nil, err
 	}
+	return createNestFS(fsys), nil
+}
+
+func createNestFS(fsys FS) *nestFS {
 	return &nestFS{
-		fsys: fsys,
-	}, nil
+		fsys:  fsys,
+		fsMap: map[string]*nestFS{},
+	}
 }
