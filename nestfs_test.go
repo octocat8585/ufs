@@ -226,4 +226,3 @@ func TestNestFSStat(t *testing.T) {
 func TestNestFS(t *testing.T) {
 	testFileSystem(t, newNestFS, "memory://")
 }
-
