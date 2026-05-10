@@ -61,40 +61,24 @@ func (fsys *nestFS) mountArchive(name string) (*nestFS, error) {
 	if ok {
 		absName, err := lfs.getAbsPath(name)
 		if err != nil {
-			return nil, &fs.PathError{
-				Op:   "mount",
-				Path: name,
-				Err:  err,
-			}
+			return nil, pathError("mount", name, err)
 		}
 		newFS, err = newArchiveFSFromLocalFS(ctx, absName)
 		if err != nil {
-			return nil, &fs.PathError{
-				Op:   "mount",
-				Path: name,
-				Err:  err,
-			}
+			return nil, pathError("mount", name, err)
 		}
 	} else {
 		f, err := fsys.Open(name)
 		if err != nil {
-			return nil, &fs.PathError{
-				Op:   "mount",
-				Path: name,
-				Err:  err,
-			}
+			return nil, pathError("mount", name, err)
 		}
 		newFS, err = newArchiveFSFromFile(f)
 		if err != nil {
-			return nil, &fs.PathError{
-				Op:   "mount",
-				Path: name,
-				Err:  err,
-			}
+			return nil, pathError("mount", name, err)
 		}
 	}
 
-	wrapped := createNestFS(newFS)
+	wrapped := makeNestFS(newFS)
 	fsys.fsMap[name+".d"] = wrapped
 	return wrapped, nil
 }
@@ -118,19 +102,11 @@ func (fsys *nestFS) getFSAndSubpath(name string) (*nestFS, string, error) {
 			subPath := removePathComponent(targetName, archiveDirName)
 			subFS, err := targetFS.mountArchive(archiveName)
 			if err != nil {
-				return nil, "", &fs.PathError{
-					Op:   "mount",
-					Path: name,
-					Err:  fmt.Errorf("cannot mount archive %s, %w", archiveName, err),
-				}
+				return nil, "", pathError("mount", name, fmt.Errorf("cannot mount archive %s, %w", archiveName, err))
 			}
 			targetFS, targetName, err := subFS.getFSAndSubpath(subPath)
 			if err != nil {
-				return nil, "", &fs.PathError{
-					Op:   "mount",
-					Path: name,
-					Err:  fmt.Errorf("cannot mount archive %s, %w", archiveName, err),
-				}
+				return nil, "", pathError("mount", name, fmt.Errorf("cannot mount archive %s, %w", archiveName, err))
 			}
 			return targetFS, targetName, nil
 		}
@@ -183,11 +159,7 @@ func (fsys *nestFS) ReadDir(name string) ([]fs.DirEntry, error) {
 
 	readDirFile, ok := f.(fs.ReadDirFile)
 	if !ok {
-		return nil, &fs.PathError{
-			Op:   "readDir",
-			Path: name,
-			Err:  fmt.Errorf("%s is not a directory", name),
-		}
+		return nil, pathError("readDir", name, fmt.Errorf("%s is not a directory", name))
 	}
 	return readDirFile.ReadDir(-1)
 }
@@ -220,7 +192,7 @@ func (fsys *nestFS) ReadLink(name string) (string, error) {
 	if cFsys, ok := fsys.fsys.(fs.ReadLinkFS); ok {
 		return cFsys.ReadLink(name)
 	}
-	return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrInvalid}
+	return "", pathError("readlink", name, fs.ErrInvalid)
 }
 
 func (fsys *nestFS) Lstat(name string) (fs.FileInfo, error) {
@@ -242,10 +214,10 @@ func newNestFS(name string) (FS, error) {
 	if err != nil {
 		return nil, err
 	}
-	return createNestFS(fsys), nil
+	return makeNestFS(fsys), nil
 }
 
-func createNestFS(fsys FS) *nestFS {
+func makeNestFS(fsys FS) *nestFS {
 	return &nestFS{
 		fsys:  fsys,
 		fsMap: map[string]*nestFS{},

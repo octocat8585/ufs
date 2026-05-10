@@ -23,11 +23,7 @@ import (
 
 func validPath(op string, name string) error {
 	if !fs.ValidPath(name) {
-		return &fs.PathError{
-			Op:   op,
-			Path: name,
-			Err:  fmt.Errorf("%q is not a valid path for %s, %w", name, runtime.GOOS, fs.ErrInvalid),
-		}
+		return pathError(op, name, fmt.Errorf("%q is not a valid path for %s, %w", name, runtime.GOOS, fs.ErrInvalid))
 	}
 	return nil
 }
@@ -42,4 +38,12 @@ func isDirName(name string) bool {
 
 func isCwd(name string) bool {
 	return name == "" || name == "."
+}
+
+func pathError(op string, name string, err error) error {
+	return &fs.PathError{
+		Op:   op,
+		Path: name,
+		Err:  err,
+	}
 }

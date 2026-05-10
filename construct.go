@@ -16,7 +16,6 @@ package ufs
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"runtime"
 	"strings"
@@ -43,9 +42,5 @@ func newBaseFS(name string) (FS, error) {
 	if err == nil && stat != nil {
 		return newLocalFS(name)
 	}
-	return nil, &fs.PathError{
-		Op:   "mount",
-		Path: name,
-		Err:  fmt.Errorf("%q is not a valid mount path for %s, %w", name, runtime.GOOS, err),
-	}
+	return nil, pathError("mount", name, fmt.Errorf("%q is not a valid mount path for %s, %w", name, runtime.GOOS, err))
 }

@@ -79,35 +79,35 @@ func TestAngryFSMkdirAll(t *testing.T) {
 }
 
 func TestAngryFSReadFile(t *testing.T) {
-	afs := &angryFS{}
+	afs := makeAngryFS()
 	if _, err := afs.ReadFile("foo.txt"); err != fs.ErrInvalid {
 		t.Errorf("ReadFile() = %v, want %v", err, fs.ErrInvalid)
 	}
 }
 
 func TestAngryFSReadLink(t *testing.T) {
-	afs := &angryFS{}
+	afs := makeAngryFS()
 	if _, err := afs.ReadLink("foo.txt"); err != fs.ErrInvalid {
 		t.Errorf("ReadLink() = %v, want %v", err, fs.ErrInvalid)
 	}
 }
 
 func TestAngryFSLstat(t *testing.T) {
-	afs := &angryFS{}
+	afs := makeAngryFS()
 	if _, err := afs.Lstat("foo.txt"); err != fs.ErrInvalid {
 		t.Errorf("Lstat() = %v, want %v", err, fs.ErrInvalid)
 	}
 }
 
 func TestAngryFSReadDir(t *testing.T) {
-	afs := &angryFS{}
+	afs := makeAngryFS()
 	if _, err := afs.ReadDir("dir"); err != fs.ErrInvalid {
 		t.Errorf("ReadDir() = %v, want %v", err, fs.ErrInvalid)
 	}
 }
 
 func TestAngryFSGlob(t *testing.T) {
-	afs := &angryFS{}
+	afs := makeAngryFS()
 	if _, err := afs.Glob("*.txt"); err != fs.ErrInvalid {
 		t.Errorf("Glob() = %v, want %v", err, fs.ErrInvalid)
 	}

@@ -51,22 +51,14 @@ func (fsys *archiveFS) Create(name string) (File, error) {
 	if err := validPath("create", name); err != nil {
 		return nil, err
 	}
-	return nil, &fs.PathError{
-		Op:   "create",
-		Path: name,
-		Err:  fmt.Errorf("archiveFS mounts are read-only, cannot create file, %q, %w", name, fs.ErrPermission),
-	}
+	return nil, pathError("create", name, fmt.Errorf("archiveFS mounts are read-only, cannot create file, %q, %w", name, fs.ErrPermission))
 }
 
 func (fsys *archiveFS) MkdirAll(name string, perm fs.FileMode) error {
 	if err := validPath("mkdir", name); err != nil {
 		return err
 	}
-	return &fs.PathError{
-		Op:   "mkdir",
-		Path: name,
-		Err:  fmt.Errorf("archiveFS mounts are read-only, cannot create directory, %q, %w", name, fs.ErrPermission),
-	}
+	return pathError("mkdir", name, fmt.Errorf("archiveFS mounts are read-only, cannot create directory, %q, %w", name, fs.ErrPermission))
 }
 
 func (fsys *archiveFS) ReadFile(name string) ([]byte, error) {
@@ -88,9 +80,7 @@ func newArchiveFSFromLocalFS(ctx context.Context, name string) (*archiveFS, erro
 	if err != nil {
 		return nil, fmt.Errorf("cannot mount %q as archiveFS, %w", name, err)
 	}
-	return &archiveFS{
-		fsys: fsys,
-	}, nil
+	return makeArchiveFS(fsys), nil
 }
 
 func coerceToReaderAt(file fs.File) (io.ReaderAt, error) {
@@ -130,10 +120,14 @@ func newArchiveFSFromFile(file fs.File) (*archiveFS, error) {
 				Stream: r,
 				Format: af,
 			}
-			return &archiveFS{
-				fsys: afs,
-			}, nil
+			return makeArchiveFS(afs), nil
 		}
 	}
 	return nil, fmt.Errorf("archive not recognized")
+}
+
+func makeArchiveFS(fsys fs.FS) *archiveFS {
+	return &archiveFS{
+		fsys: fsys,
+	}
 }
