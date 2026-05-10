@@ -76,38 +76,6 @@ func TestTempMountFSPrepareError(t *testing.T) {
 	}
 }
 
-func TestTempMountFSReadFile(t *testing.T) {
-	fsys, err := newTempMountFS("test://", func(string) error { return nil })
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer fsys.Close()
-
-	f, err := fsys.Create("readfile.txt")
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
-	wantData := "hello world"
-	if _, err := f.WriteString(wantData); err != nil {
-		t.Fatalf("WriteString failed: %v", err)
-	}
-	if err := f.Close(); err != nil {
-		t.Fatalf("file Close failed: %v", err)
-	}
-
-	rfs, ok := fsys.(fs.ReadFileFS)
-	if !ok {
-		t.Fatal("tempMountFS does not implement fs.ReadFileFS")
-	}
-	got, err := rfs.ReadFile("readfile.txt")
-	if err != nil {
-		t.Fatalf("ReadFile failed: %v", err)
-	}
-	if string(got) != wantData {
-		t.Errorf("ReadFile = %q, want %q", string(got), wantData)
-	}
-}
-
 func TestTempMountFSReadLink(t *testing.T) {
 	var tempDir string
 	fsys, err := newTempMountFS("test://", func(dir string) error {

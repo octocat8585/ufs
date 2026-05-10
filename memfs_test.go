@@ -655,13 +655,3 @@ func TestMemFSMkdirAllInvalid(t *testing.T) {
 	}
 }
 
-func TestMemFSClose(t *testing.T) {
-	fsys, err := newMemFS("memory://test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := fsys.Close(); err != nil {
-		t.Errorf("Close() = %v, want nil", err)
-	}
-}

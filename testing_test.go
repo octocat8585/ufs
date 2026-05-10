@@ -200,6 +200,76 @@ var (
 	}
 )
 
+func TestFSClose(t *testing.T) {
+	t.Parallel()
+	for _, tc := range append(fsTestCases, readOnlyFSTestCases...) {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fsys, err := tc.createFS(t)
+			if err != nil {
+				t.Fatalf("cannot create file system: %s", err)
+			}
+			if err := fsys.Close(); err != nil {
+				t.Errorf("Close() = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestFSMkdirAll(t *testing.T) {
+	t.Parallel()
+	for _, tc := range append(fsTestCases, readOnlyFSTestCases...) {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fsys, err := tc.createFS(t)
+			if err != nil {
+				t.Fatalf("cannot create file system: %s", err)
+			}
+			defer fsys.Close()
+			if err := fsys.MkdirAll("subdir", fs.ModePerm); err != nil {
+				t.Errorf("MkdirAll() = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestFSReadFile(t *testing.T) {
+	t.Parallel()
+	for _, tc := range fsTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			wantData := randomString(100)
+			t.Parallel()
+			fsys, err := tc.createFS(t)
+			if err != nil {
+				t.Fatalf("cannot create file system: %s", err)
+			}
+			defer fsys.Close()
+			f, err := fsys.Create("readfile_test.txt")
+			if err != nil {
+				t.Fatalf("Create failed: %v", err)
+			}
+			if _, err := io.WriteString(f, wantData); err != nil {
+				t.Fatalf("WriteString failed: %v", err)
+			}
+			if err := f.Close(); err != nil {
+				t.Fatalf("Close failed: %v", err)
+			}
+
+			rfs, ok := fsys.(fs.ReadFileFS)
+			if !ok {
+				t.Skip("does not implement fs.ReadFileFS")
+			}
+			got, err := rfs.ReadFile("readfile_test.txt")
+			if err != nil {
+				t.Fatalf("ReadFile failed: %v", err)
+			}
+			if diff := cmp.Diff(wantData, string(got)); diff != "" {
+				t.Errorf("ReadFile mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func verifyReadOnlyFS(t *testing.T, fsys fs.FS) {
 	t.Helper()
 
