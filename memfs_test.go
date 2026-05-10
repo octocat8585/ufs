@@ -654,4 +654,3 @@ func TestMemFSMkdirAllInvalid(t *testing.T) {
 		t.Error("MkdirAll(invalid/../path) succeeded, want error")
 	}
 }
-
