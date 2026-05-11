@@ -21,7 +21,8 @@ on:
     branches: ["main"]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    # runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -29,18 +30,19 @@ jobs:
         - "stable"
         # - "oldstable"
         goos:
-        #- "android"
-        - "darwin"
-        - "freebsd"
-        #- "ios"
+        #- "darwin"
+        #- "freebsd"
         - "linux"
-        - "netbsd"
-        - "openbsd"
-        - "windows"
+        #- "netbsd"
+        #- "openbsd"
+        #- "windows"
+        # Doesn't work
+        #- "android"
+        #- "ios"
         goarch:
         - "amd64"
-        - "arm"
-        - "arm64"
+        #- "arm"
+        #- "arm64"
         exclude:
         - goos: "darwin"
           goarch: "arm"
