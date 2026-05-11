@@ -18,25 +18,235 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
+
+var (
+	pathTestCases = []struct {
+		input                      string
+		wantTrimSlash              string
+		wantSplitPath              []string
+		wantIsCwd                  bool
+		wantIsDirName              bool
+		wantCoerceUnix             string
+		wantIsMountableArchivePath bool
+	}{
+		{
+			input:                      "",
+			wantTrimSlash:              "",
+			wantSplitPath:              []string{""},
+			wantIsCwd:                  true,
+			wantIsDirName:              true,
+			wantCoerceUnix:             "",
+			wantIsMountableArchivePath: false,
+		},
+		{
+			input:                      ".",
+			wantTrimSlash:              ".",
+			wantSplitPath:              []string{"."},
+			wantIsCwd:                  true,
+			wantIsDirName:              true,
+			wantCoerceUnix:             ".",
+			wantIsMountableArchivePath: false,
+		},
+		{
+			input:                      "/",
+			wantTrimSlash:              "",
+			wantSplitPath:              []string{""},
+			wantIsCwd:                  false,
+			wantIsDirName:              true,
+			wantCoerceUnix:             "/",
+			wantIsMountableArchivePath: false,
+		},
+		{
+			input:                      "abc",
+			wantTrimSlash:              "abc",
+			wantSplitPath:              []string{"abc"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "abc",
+			wantIsMountableArchivePath: false,
+		},
+		{
+			input:                      "/abc/d/",
+			wantTrimSlash:              "abc/d",
+			wantSplitPath:              []string{"abc", "d"},
+			wantIsCwd:                  false,
+			wantIsDirName:              true,
+			wantCoerceUnix:             "/abc/d/",
+			wantIsMountableArchivePath: false,
+		},
+		{
+			input:                      "abc/d/",
+			wantTrimSlash:              "abc/d",
+			wantSplitPath:              []string{"abc", "d"},
+			wantIsCwd:                  false,
+			wantIsDirName:              true,
+			wantCoerceUnix:             "abc/d/",
+			wantIsMountableArchivePath: false,
+		},
+		{
+			input:                      "/abc/d",
+			wantTrimSlash:              "abc/d",
+			wantSplitPath:              []string{"abc", "d"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "/abc/d",
+			wantIsMountableArchivePath: false,
+		},
+		{
+			input:                      "abc\\d",
+			wantTrimSlash:              "abc\\d",
+			wantSplitPath:              []string{"abc\\d"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "abc/d",
+			wantIsMountableArchivePath: false,
+		},
+		{
+			input:                      "\\abc\\",
+			wantTrimSlash:              "abc",
+			wantSplitPath:              []string{"abc"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "/abc/",
+			wantIsMountableArchivePath: false,
+		},
+		{
+			input:                      "ok.tar",
+			wantTrimSlash:              "ok.tar",
+			wantSplitPath:              []string{"ok.tar"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "ok.tar",
+			wantIsMountableArchivePath: true,
+		},
+		{
+			input:                      "ok.tar.gz",
+			wantTrimSlash:              "ok.tar.gz",
+			wantSplitPath:              []string{"ok.tar.gz"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "ok.tar.gz",
+			wantIsMountableArchivePath: true,
+		},
+		{
+			input:                      "ok.tar.bz2",
+			wantTrimSlash:              "ok.tar.bz2",
+			wantSplitPath:              []string{"ok.tar.bz2"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "ok.tar.bz2",
+			wantIsMountableArchivePath: true,
+		},
+		{
+			input:                      "ok.tar.xz",
+			wantTrimSlash:              "ok.tar.xz",
+			wantSplitPath:              []string{"ok.tar.xz"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "ok.tar.xz",
+			wantIsMountableArchivePath: true,
+		},
+		{
+			input:                      "ok.tar.lz4",
+			wantTrimSlash:              "ok.tar.lz4",
+			wantSplitPath:              []string{"ok.tar.lz4"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "ok.tar.lz4",
+			wantIsMountableArchivePath: true,
+		},
+		{
+			input:                      "ok.tar.br",
+			wantTrimSlash:              "ok.tar.br",
+			wantSplitPath:              []string{"ok.tar.br"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "ok.tar.br",
+			wantIsMountableArchivePath: true,
+		},
+		{
+			input:                      "ok.tar.zst",
+			wantTrimSlash:              "ok.tar.zst",
+			wantSplitPath:              []string{"ok.tar.zst"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "ok.tar.zst",
+			wantIsMountableArchivePath: true,
+		},
+		{
+			input:                      "ok.zip",
+			wantTrimSlash:              "ok.zip",
+			wantSplitPath:              []string{"ok.zip"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "ok.zip",
+			wantIsMountableArchivePath: true,
+		},
+		{
+			input:                      "ok.tar.lzma",
+			wantTrimSlash:              "ok.tar.lzma",
+			wantSplitPath:              []string{"ok.tar.lzma"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "ok.tar.lzma",
+			wantIsMountableArchivePath: false,
+		},
+		{
+			input:                      "ok.7z",
+			wantTrimSlash:              "ok.7z",
+			wantSplitPath:              []string{"ok.7z"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "ok.7z",
+			wantIsMountableArchivePath: true,
+		},
+		{
+			input:                      "ok.7Z",
+			wantTrimSlash:              "ok.7Z",
+			wantSplitPath:              []string{"ok.7Z"},
+			wantIsCwd:                  false,
+			wantIsDirName:              false,
+			wantCoerceUnix:             "ok.7Z",
+			wantIsMountableArchivePath: true,
+		},
+	}
+)
+
+func TestTrimSlash(t *testing.T) {
+	t.Parallel()
+	for _, tc := range pathTestCases {
+		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+			if got := trimSlash(tc.input); got != tc.wantTrimSlash {
+				t.Errorf("trimSlash(%q) got: %v, want: %v", tc.input, got, tc.wantTrimSlash)
+			}
+		})
+	}
+}
+
+func TestSplitPath(t *testing.T) {
+	t.Parallel()
+	for _, tc := range pathTestCases {
+		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+			got := splitPath(tc.input)
+			if diff := cmp.Diff(got, tc.wantSplitPath); diff != "" {
+				t.Errorf("splitPath(%q) got: %v, want: %v, diff: %s", tc.input, got, tc.wantTrimSlash, diff)
+			}
+		})
+	}
+}
 
 func TestIsCwd(t *testing.T) {
 	t.Parallel()
-	testCases := []struct {
-		input string
-		want  bool
-	}{
-		{input: "", want: true},
-		{input: ".", want: true},
-		{input: "foo", want: false},
-		{input: "..", want: false},
-		{input: "foo/bar", want: false},
-	}
-	for _, tc := range testCases {
+	for _, tc := range pathTestCases {
 		t.Run(fmt.Sprintf("%q", tc.input), func(t *testing.T) {
 			t.Parallel()
-			if got := isCwd(tc.input); got != tc.want {
-				t.Errorf("isCwd(%q) = %v, want %v", tc.input, got, tc.want)
+			if got := isCwd(tc.input); got != tc.wantIsCwd {
+				t.Errorf("isCwd(%q) got: %v, want: %v", tc.input, got, tc.wantIsCwd)
 			}
 		})
 	}
@@ -44,23 +254,11 @@ func TestIsCwd(t *testing.T) {
 
 func TestIsDirName(t *testing.T) {
 	t.Parallel()
-	testCases := []struct {
-		input string
-		want  bool
-	}{
-		{input: "", want: true},
-		{input: "/", want: true},
-		{input: "dir/", want: true},
-		{input: "a/b/c/", want: true},
-		{input: "file.txt", want: false},
-		{input: "dir/file.txt", want: false},
-		{input: ".", want: false},
-	}
-	for _, tc := range testCases {
+	for _, tc := range pathTestCases {
 		t.Run(fmt.Sprintf("%q", tc.input), func(t *testing.T) {
 			t.Parallel()
-			if got := isDirName(tc.input); got != tc.want {
-				t.Errorf("isDirName(%q) = %v, want %v", tc.input, got, tc.want)
+			if got := isDirName(tc.input); got != tc.wantIsDirName {
+				t.Errorf("isDirName(%q) got: %v, want: %v", tc.input, got, tc.wantIsDirName)
 			}
 		})
 	}
@@ -100,23 +298,12 @@ func TestValidPath(t *testing.T) {
 
 func TestCoerceUnix(t *testing.T) {
 	t.Parallel()
-	testCases := []struct {
-		input string
-		want  string
-	}{
-		{input: ".", want: "."},
-		{input: "\\", want: "/"},
-		{input: "/", want: "/"},
-		{input: "\\abc\\", want: "/abc/"},
-		{input: "abc", want: "abc"},
-	}
-	for _, tc := range testCases {
+	for _, tc := range pathTestCases {
 		t.Run(tc.input, func(t *testing.T) {
 			t.Parallel()
 			got := coerceUnix(tc.input)
-
-			if got != tc.want {
-				t.Errorf("got: %q, want: %q", got, tc.want)
+			if got != tc.wantCoerceUnix {
+				t.Errorf("coerceUnix(%q) got: %q, want: %q", tc.input, got, tc.wantCoerceUnix)
 			}
 		})
 	}

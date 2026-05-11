@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"strings"
 
 	"github.com/mholt/archives"
 )
@@ -29,7 +30,19 @@ var (
 	_ FS            = (*archiveFS)(nil)
 	_ fs.ReadFileFS = (*archiveFS)(nil)
 	_ fs.ReadDirFS  = (*archiveFS)(nil)
+
+	archiveExtList = []string{".tar", ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz4", ".tar.br", ".tar.zst", ".rar", ".zip", ".7z"}
 )
+
+func isMountableArchivePath(name string) bool {
+	lowerPath := strings.ToLower(name)
+	for _, suffix := range archiveExtList {
+		if strings.HasSuffix(lowerPath, suffix) {
+			return true
+		}
+	}
+	return false
+}
 
 type archiveFS struct {
 	fsys fs.FS

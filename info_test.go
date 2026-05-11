@@ -81,3 +81,33 @@ func TestInfo(t *testing.T) {
 		t.Errorf("Sys() = %v, want %v", info.Sys(), nil)
 	}
 }
+
+func TestVirtualDirEntry(t *testing.T) {
+	entry := makeVirtualDirEntry("mydir")
+	if entry.Name() != "mydir" {
+		t.Errorf("Name() = %q, want: %q", entry.Name(), "mydir")
+	}
+	if !entry.IsDir() {
+		t.Error("IsDir() got: false, want: true")
+	}
+	if entry.Type() != fs.ModeDir {
+		t.Errorf("Type() got: %v, want: %v", entry.Type(), fs.ModeDir)
+	}
+	if entry.Mode() != fs.ModeDir {
+		t.Errorf("Mode() got: %v, want: %v", entry.Mode(), fs.ModeDir)
+	}
+	if got, err := entry.Info(); err != nil {
+		t.Errorf("Info() returned error: %v", err)
+	} else if got != entry {
+		t.Errorf("Info() got: %v, want: %v", got, entry)
+	}
+	if entry.Size() != 0 {
+		t.Errorf("Size() got: %d, want: 0", entry.Size())
+	}
+	if entry.ModTime() != unixEpochTime {
+		t.Errorf("ModTime() got: %v, want: %v", entry.ModTime(), unixEpochTime)
+	}
+	if entry.Sys() != nil {
+		t.Errorf("Sys() got: %v, want: nil", entry.Sys())
+	}
+}

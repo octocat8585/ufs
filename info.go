@@ -20,7 +20,11 @@ import (
 )
 
 var (
-	_ FileInfo = (*fsInfo)(nil)
+	_ FileInfo    = (*fsInfo)(nil)
+	_ fs.DirEntry = (*virtualDirEntry)(nil)
+	_ fs.FileInfo = (*virtualDirEntry)(nil)
+
+	unixEpochTime = time.Time{}
 )
 
 type fsInfo struct {
@@ -54,4 +58,46 @@ func (finfo *fsInfo) IsDir() bool {
 
 func (finfo *fsInfo) Sys() any {
 	return finfo.sys
+}
+
+type virtualDirEntry struct {
+	name string
+}
+
+func (entry *virtualDirEntry) Name() string {
+	return entry.name
+}
+
+func (entry *virtualDirEntry) IsDir() bool {
+	return true
+}
+
+func (entry *virtualDirEntry) Type() fs.FileMode {
+	return fs.ModeDir
+}
+
+func (entry *virtualDirEntry) Mode() fs.FileMode {
+	return entry.Type()
+}
+
+func (entry *virtualDirEntry) Info() (fs.FileInfo, error) {
+	return entry, nil
+}
+
+func (entry *virtualDirEntry) Size() int64 {
+	return 0
+}
+
+func (entry *virtualDirEntry) ModTime() time.Time {
+	return unixEpochTime
+}
+
+func (entry *virtualDirEntry) Sys() any {
+	return nil
+}
+
+func makeVirtualDirEntry(name string) *virtualDirEntry {
+	return &virtualDirEntry{
+		name: name,
+	}
 }
