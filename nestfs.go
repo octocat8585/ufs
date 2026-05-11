@@ -40,7 +40,7 @@ func getPotentialArchives(name string) []string {
 	components := strings.Split(name, string(os.PathSeparator))
 	potentials := []string{}
 	for idx, component := range components {
-		if strings.HasSuffix(component, ".d") {
+		if strings.HasSuffix(component, archiveDirExt) {
 			potentials = append(potentials, filepath.Join(components[0:idx+1]...))
 		}
 	}
@@ -79,7 +79,7 @@ func (fsys *nestFS) mountArchive(name string) (*nestFS, error) {
 	}
 
 	wrapped := makeNestFS(newFS)
-	fsys.fsMap[name+".d"] = wrapped
+	fsys.fsMap[name+archiveDirExt] = wrapped
 	return wrapped, nil
 }
 
@@ -96,7 +96,7 @@ func (fsys *nestFS) getFSAndSubpath(name string) (*nestFS, string, error) {
 
 	archiveDirNames := getPotentialArchives(targetName)
 	for _, archiveDirName := range archiveDirNames {
-		archiveName := strings.TrimSuffix(archiveDirName, ".d")
+		archiveName := strings.TrimSuffix(archiveDirName, archiveDirExt)
 		info, err := targetFS.Stat(archiveName)
 		if info != nil && err == nil {
 			subPath := removePathComponent(targetName, archiveDirName)

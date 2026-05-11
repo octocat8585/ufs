@@ -26,6 +26,10 @@ import (
 	"github.com/mholt/archives"
 )
 
+const (
+	archiveDirExt = ".d"
+)
+
 var (
 	_ FS            = (*archiveFS)(nil)
 	_ fs.ReadFileFS = (*archiveFS)(nil)
