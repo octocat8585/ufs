@@ -24,6 +24,18 @@ import (
 
 const testArchive = "testing/testassets/archives/testassets.tar.gz"
 
+func TestIsMountableArchivePath(t *testing.T) {
+	t.Parallel()
+	for _, tc := range pathTestCases {
+		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+			if got := isMountableArchivePath(tc.input); got != tc.wantIsMountableArchivePath {
+				t.Errorf("isMountableArchivePath(%q) got: %v, want: %v", tc.input, got, tc.wantIsMountableArchivePath)
+			}
+		})
+	}
+}
+
 func mustArchiveFS(t *testing.T) FS {
 	t.Helper()
 	fsys, err := newArchiveFSFromLocalFS(context.Background(), testArchive)

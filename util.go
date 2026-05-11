@@ -17,9 +17,23 @@ package ufs
 import (
 	"fmt"
 	"io/fs"
+	"os"
 	"runtime"
 	"strings"
 )
+
+const (
+	pathSeparator     = string(os.PathSeparator)
+	unixPathSeparator = "/"
+)
+
+func trimSlash(name string) string {
+	return strings.Trim(name, "\\/")
+}
+
+func splitPath(name string) []string {
+	return strings.Split(trimSlash(name), pathSeparator)
+}
 
 func validPath(op string, name string) error {
 	if !fs.ValidPath(name) {
@@ -28,12 +42,12 @@ func validPath(op string, name string) error {
 	return nil
 }
 
-func coerceUnix(path string) string {
-	return strings.ReplaceAll(path, "\\", "/")
+func coerceUnix(name string) string {
+	return strings.ReplaceAll(name, "\\", unixPathSeparator)
 }
 
 func isDirName(name string) bool {
-	return name == "" || strings.HasSuffix(name, "/")
+	return isCwd(name) || strings.HasSuffix(name, pathSeparator)
 }
 
 func isCwd(name string) bool {
