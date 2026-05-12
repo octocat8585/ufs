@@ -50,6 +50,10 @@ type nestFS struct {
 	fsMap map[string]*nestFS
 }
 
+func (fsys *nestFS) addMount(name string, mountedFS *nestFS) {
+	fsys.fsMap[name] = mountedFS
+}
+
 func (fsys *nestFS) mountArchive(name string) (*nestFS, error) {
 	ctx := context.Background()
 	lfs, ok := fsys.fsys.(*localFS)
@@ -75,7 +79,7 @@ func (fsys *nestFS) mountArchive(name string) (*nestFS, error) {
 	}
 
 	wrapped := makeNestFS(newFS)
-	fsys.fsMap[name+archiveDirExt] = wrapped
+	fsys.addMount(name+archiveDirExt, wrapped)
 	return wrapped, nil
 }
 

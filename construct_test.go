@@ -36,6 +36,7 @@ func TestNew(t *testing.T) {
 		uri      string
 		wantType string
 		wantErr  bool
+		nested   bool
 	}{
 		{
 			uri:      "angry://",
@@ -77,9 +78,18 @@ func TestNew(t *testing.T) {
 			wantType: reflect.TypeFor[*nullFS]().Name(),
 			wantErr:  false,
 		},
+		{
+			uri:      "file:///?a=memory://",
+			wantType: reflect.TypeFor[*nullFS]().Name(),
+			wantErr:  false,
+			nested:   true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("newBaseFS(%q)", tt.uri), func(t *testing.T) {
+			if tt.nested {
+				t.Skip("test case requires nestFS support")
+			}
 			got, err := newBaseFS(tt.uri)
 			if tt.wantErr {
 				if err == nil {
@@ -116,6 +126,65 @@ func TestNew(t *testing.T) {
 						t.Errorf("%q is not of type *nestFS", got)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestCreateURI(t *testing.T) {
+	tests := []struct {
+		name   string
+		mounts map[string]string
+		want   string
+	}{
+		{
+			name:   "memory://",
+			mounts: map[string]string{},
+			want:   "memory:",
+		},
+		{
+			name:   "angry://",
+			mounts: map[string]string{},
+			want:   "angry:",
+		},
+		{
+			name:   "null://",
+			mounts: map[string]string{},
+			want:   "null:",
+		},
+		{
+			name:   "file://",
+			mounts: map[string]string{},
+			want:   "file:",
+		},
+		{
+			name: "file:///",
+			mounts: map[string]string{
+				"mounted/null":   "null://",
+				"mounted/angry":  "angry://",
+				"mounted/memory": "memory://",
+			},
+			want: "file:///?mounted%2Fangry=angry%3A&mounted%2Fmemory=memory%3A&mounted%2Fnull=null%3A",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := CreateURI(tc.name, tc.mounts)
+			if err != nil {
+				t.Errorf("CreateURI(%q, %v) got error: %s", tc.name, tc.mounts, err)
+			}
+			if got != tc.want {
+				t.Errorf("CreateURI(%q, %v) got: %q, want: %q", tc.name, tc.mounts, got, tc.want)
+			}
+			fsys, err := New(got)
+			if err != nil {
+				t.Fatalf("New(%q) got error: %s", got, err)
+			}
+
+			gotTypeName := reflect.TypeOf(fsys).Name()
+			wantType := reflect.TypeFor[*nestFS]().Name()
+			if gotTypeName != wantType {
+				t.Errorf("New(%q) = %q, want %q", got, fsys, wantType)
 			}
 		})
 	}

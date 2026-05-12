@@ -16,12 +16,62 @@ package ufs
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
 )
 
+// CreateURI creates a URI that specifies the configuration for how to construct the file system with nested mount points.
+func CreateURI(name string, nested map[string]string) (string, error) {
+	u, err := nameToURI(name)
+	if err != nil {
+		return "", err
+	}
+	vals := u.Query()
+	for mountPoint, uri := range nested {
+		mu, err := nameToURI(uri)
+		if err != nil {
+			return "", err
+		}
+		vals.Set(mountPoint, mu.String())
+	}
+	u.RawQuery = vals.Encode()
+	return u.String(), nil
+}
+
+func nameToURI(name string) (*url.URL, error) {
+	u, err := url.Parse(name)
+	if err != nil {
+		origErr := err
+		// Assume the name is a local file path.
+		u, err = url.Parse("file://" + name)
+		if err != nil {
+			return nil, fmt.Errorf("%q is not a uri for file system, %w", name, origErr)
+		}
+	}
+	return u, nil
+}
+
+// New creates a new nested file system. Use CreateURI to construct the string.
 func New(name string) (FS, error) {
+	u, err := url.Parse(name)
+	if err == nil {
+		bFS, err := newBaseFS(u.Scheme + "://" + u.Path)
+		if err == nil {
+			nFS := makeNestFS(bFS)
+			vals := u.Query()
+			for mountPath, mountURI := range vals {
+				mountFS, err := newBaseFS(mountURI[0])
+				if err != nil {
+					return nil, err
+				}
+				nFS.addMount(mountPath, makeNestFS(mountFS))
+			}
+			return nFS, nil
+		}
+	}
+
 	fsys, err := newBaseFS(name)
 	if err != nil {
 		return nil, err
@@ -30,19 +80,19 @@ func New(name string) (FS, error) {
 }
 
 func newBaseFS(name string) (FS, error) {
-	if strings.HasPrefix(name, "memory://") {
+	if strings.HasPrefix(name, "memory:") {
 		return newMemFS(name)
 	}
-	if strings.HasPrefix(name, "angry://") {
+	if strings.HasPrefix(name, "angry:") {
 		return newAngryFS(name)
 	}
-	if strings.HasPrefix(name, "null://") {
+	if strings.HasPrefix(name, "null:") {
 		return newNullFS(name)
 	}
-	if strings.HasPrefix(name, "file://") {
+	if strings.HasPrefix(name, "file:") {
 		return newLocalFS(name)
 	}
-	if strings.HasPrefix(name, "gs://") {
+	if strings.HasPrefix(name, "gs:") {
 		return newGCSFS(name)
 	}
 
