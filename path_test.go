@@ -42,12 +42,12 @@ var (
 			wantIsMountableArchivePath: false,
 		},
 		{
-			input:                      ".",
-			wantTrimSlash:              ".",
-			wantSplitPath:              []string{"."},
+			input:                      cwdPath,
+			wantTrimSlash:              cwdPath,
+			wantSplitPath:              []string{cwdPath},
 			wantIsCwd:                  true,
 			wantIsDirName:              true,
-			wantCoerceUnix:             ".",
+			wantCoerceUnix:             cwdPath,
 			wantIsMountableArchivePath: false,
 		},
 		{
@@ -215,6 +215,78 @@ var (
 	}
 )
 
+func TestRemovePathPrefix(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		path       string
+		removePath string
+		want       string
+		wantOk     bool
+	}{
+		{
+			path:       "",
+			removePath: "",
+			want:       cwdPath,
+			wantOk:     true,
+		},
+		{
+			path:       cwdPath,
+			removePath: "",
+			want:       cwdPath,
+			wantOk:     true,
+		},
+		{
+			path:       "",
+			removePath: cwdPath,
+			want:       cwdPath,
+			wantOk:     true,
+		},
+		{
+			path:       "a/b/c",
+			removePath: "a/b",
+			want:       "c",
+			wantOk:     true,
+		},
+		{
+			path:       "a/b/c/",
+			removePath: "a/b/",
+			want:       "c",
+			wantOk:     true,
+		},
+		{
+			path:       "a/b/c",
+			removePath: "a/b/",
+			want:       "c",
+			wantOk:     true,
+		},
+		{
+			path:       "a/b/c/",
+			removePath: "a/b",
+			want:       "c",
+			wantOk:     true,
+		},
+		{
+			path:       "a/b",
+			removePath: "a/b/c",
+			want:       "a/b",
+			wantOk:     false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%s - %s", tc.path, tc.removePath), func(t *testing.T) {
+			t.Parallel()
+			got, gotOk := removePathPrefix(tc.path, tc.removePath)
+			if got != tc.want {
+				t.Errorf("path: got: %q, want: %q", got, tc.want)
+			}
+			if gotOk != tc.wantOk {
+				t.Errorf("ok: got: %t, want: %t", gotOk, tc.wantOk)
+			}
+		})
+	}
+}
+
 func TestTrimSlash(t *testing.T) {
 	t.Parallel()
 	for _, tc := range pathTestCases {
@@ -270,7 +342,7 @@ func TestValidPath(t *testing.T) {
 		input   string
 		wantErr bool
 	}{
-		{input: ".", wantErr: false},
+		{input: cwdPath, wantErr: false},
 		{input: "./.", wantErr: true},
 		{input: "a\\b\\.\\..\\c", wantErr: false},
 		{input: "a/b/./../c", wantErr: true},

@@ -102,11 +102,11 @@ func TestCopyCreateError(t *testing.T) {
 func TestList(t *testing.T) {
 	fsys := setupListFS(t)
 
-	got, err := List(fsys, ".")
+	got, err := List(fsys, cwdPath)
 	if err != nil {
 		t.Fatalf("List() = %v, want nil", err)
 	}
-	want := []string{".", "a.txt", "dir", "dir/b.txt", "dir/c.txt"}
+	want := []string{cwdPath, "a.txt", "dir", "dir/b.txt", "dir/c.txt"}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("List() mismatch (-want +got):\n%s", diff)
 	}
@@ -130,7 +130,7 @@ func TestListSubdir(t *testing.T) {
 func TestListFiles(t *testing.T) {
 	fsys := setupListFS(t)
 
-	got, err := ListFiles(fsys, ".")
+	got, err := ListFiles(fsys, cwdPath)
 	if err != nil {
 		t.Fatalf("ListFiles() = %v, want nil", err)
 	}
@@ -156,7 +156,7 @@ func TestListFilesInterface(t *testing.T) {
 	want := []string{"fast.txt", "path.txt"}
 	fsys := &listFilenamesFS{FS: inner, files: want}
 
-	got, err := ListFiles(fsys, ".")
+	got, err := ListFiles(fsys, cwdPath)
 	if err != nil {
 		t.Fatalf("ListFiles() via interface = %v, want nil", err)
 	}
@@ -171,7 +171,7 @@ func TestForEachFilename(t *testing.T) {
 	fsys := setupListFS(t)
 
 	var got []string
-	err := ForEachFilename(fsys, ".", func(name string) error {
+	err := ForEachFilename(fsys, cwdPath, func(name string) error {
 		got = append(got, name)
 		return nil
 	})
@@ -206,7 +206,7 @@ func TestForEachFilenameInterface(t *testing.T) {
 	fsys := &forEachFilenameFS{FS: inner, files: want}
 
 	var got []string
-	err := ForEachFilename(fsys, ".", func(name string) error {
+	err := ForEachFilename(fsys, cwdPath, func(name string) error {
 		got = append(got, name)
 		return nil
 	})
@@ -223,7 +223,7 @@ func TestForEachFilenameCallbackError(t *testing.T) {
 	sentinel := errors.New("stop")
 
 	count := 0
-	err := ForEachFilename(fsys, ".", func(_ string) error {
+	err := ForEachFilename(fsys, cwdPath, func(_ string) error {
 		count++
 		return sentinel
 	})
@@ -241,7 +241,7 @@ func TestForEachFileInfo(t *testing.T) {
 	fsys := setupListFS(t)
 
 	var gotNames []string
-	err := ForEachFileInfo(fsys, ".", func(info fs.FileInfo) error {
+	err := ForEachFileInfo(fsys, cwdPath, func(info fs.FileInfo) error {
 		gotNames = append(gotNames, info.Name())
 		return nil
 	})
@@ -280,7 +280,7 @@ func TestForEachFileInfoInterface(t *testing.T) {
 	fsys := &forEachFileInfoFS{FS: inner, infos: wantInfos}
 
 	var gotNames []string
-	err := ForEachFileInfo(fsys, ".", func(info fs.FileInfo) error {
+	err := ForEachFileInfo(fsys, cwdPath, func(info fs.FileInfo) error {
 		gotNames = append(gotNames, info.Name())
 		return nil
 	})
@@ -298,7 +298,7 @@ func TestForEachFileInfoCallbackError(t *testing.T) {
 	sentinel := errors.New("stop")
 
 	count := 0
-	err := ForEachFileInfo(fsys, ".", func(_ fs.FileInfo) error {
+	err := ForEachFileInfo(fsys, cwdPath, func(_ fs.FileInfo) error {
 		count++
 		return sentinel
 	})

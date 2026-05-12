@@ -154,7 +154,7 @@ func (f *memFile) Readdir(n int) ([]fs.FileInfo, error) {
 	defer fsys.mu.RUnlock()
 
 	prefix := ""
-	if f.name != "." {
+	if f.name != cwdPath {
 		prefix = f.name
 		if !strings.HasSuffix(prefix, "/") {
 			prefix = prefix + "/"
@@ -165,7 +165,7 @@ func (f *memFile) Readdir(n int) ([]fs.FileInfo, error) {
 	seen := make(map[string]bool)
 	var childNames []string
 	for key := range fsys.dir {
-		if key == "." {
+		if key == cwdPath {
 			continue
 		}
 		if remainder, ok := strings.CutPrefix(key, prefix); ok {
@@ -236,9 +236,9 @@ func (f *memFile) ReadDir(n int) ([]fs.DirEntry, error) {
 
 func (fsys *memFS) Open(name string) (fs.File, error) {
 	// Handle root directory
-	if name == "." {
+	if name == cwdPath {
 		return &memFile{
-			name:    ".",
+			name:    cwdPath,
 			content: nil,
 			mode:    fs.ModeDir,
 			modTime: time.Now(),
@@ -285,7 +285,7 @@ func (fsys *memFS) Create(name string) (File, error) {
 	}
 	// Ensure parent dirs exist
 	parent := path.Dir(name)
-	if parent != "." {
+	if parent != cwdPath {
 		fsys.ensureParent(parent, now)
 	}
 	return &memFile{
@@ -392,8 +392,8 @@ func (fsys *memFS) ReadLink(name string) (string, error) {
 
 func (fsys *memFS) Lstat(name string) (fs.FileInfo, error) {
 	// Root directory is never stored in the map.
-	if name == "." {
-		return &fsInfo{name: ".", mode: fs.ModeDir, isDir: true}, nil
+	if name == cwdPath {
+		return &fsInfo{name: cwdPath, mode: fs.ModeDir, isDir: true}, nil
 	}
 	if err := validPath("lstat", name); err != nil {
 		return nil, err

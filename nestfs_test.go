@@ -15,7 +15,6 @@
 package ufs
 
 import (
-	"fmt"
 	"io"
 	"io/fs"
 	"strings"
@@ -121,7 +120,7 @@ func TestGetPotentialArchives(t *testing.T) {
 			want:  []string{},
 		},
 		{
-			input: ".",
+			input: cwdPath,
 			want:  []string{},
 		},
 		{
@@ -143,51 +142,6 @@ func TestGetPotentialArchives(t *testing.T) {
 			got := getPotentialArchives(tc.input)
 			if diff := cmp.Diff(got, tc.want); diff != "" {
 				t.Errorf("got: %q, want: %q, diff: %q", got, tc.want, diff)
-			}
-		})
-	}
-}
-
-func TestRemovePathComponent(t *testing.T) {
-	t.Parallel()
-	testCases := []struct {
-		name      string
-		mountPath string
-		want      string
-	}{
-		{
-			name:      "",
-			mountPath: "",
-			want:      "",
-		},
-		{
-			name:      "a/b/c",
-			mountPath: "a/b",
-			want:      "c",
-		},
-		{
-			name:      "a/b/c",
-			mountPath: "a/b/",
-			want:      "c",
-		},
-		{
-			name:      "a/b/c/",
-			mountPath: "a/b",
-			want:      "c/",
-		},
-		{
-			name:      "a/b/c/",
-			mountPath: "a/b/",
-			want:      "c/",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("%s - %s", tc.name, tc.mountPath), func(t *testing.T) {
-			t.Parallel()
-			got := removePathComponent(tc.name, tc.mountPath)
-			if got != tc.want {
-				t.Errorf("got: %q, want: %q", got, tc.want)
 			}
 		})
 	}

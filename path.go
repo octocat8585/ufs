@@ -18,17 +18,33 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
 
 const (
-	pathSeparator     = string(os.PathSeparator)
-	unixPathSeparator = "/"
+	pathSeparator             = string(os.PathSeparator)
+	unixPathSeparator         = "/"
+	windowsPathSeparator      = "\\"
+	cwdPath                   = "."
+	unixAndWindowsSlashCutset = unixPathSeparator + windowsPathSeparator
 )
 
+func removePathPrefix(path string, removePath string) (string, bool) {
+	removePath = filepath.Clean(removePath)
+	path = filepath.Clean(path)
+	if isCwd(removePath) {
+		return path, true
+	}
+	if removePath == path {
+		return cwdPath, true
+	}
+	return strings.CutPrefix(path, removePath+pathSeparator)
+}
+
 func trimSlash(name string) string {
-	return strings.Trim(name, "\\/")
+	return strings.Trim(name, unixAndWindowsSlashCutset)
 }
 
 func splitPath(name string) []string {
@@ -43,7 +59,7 @@ func validPath(op string, name string) error {
 }
 
 func coerceUnix(name string) string {
-	return strings.ReplaceAll(name, "\\", unixPathSeparator)
+	return strings.ReplaceAll(name, windowsPathSeparator, unixPathSeparator)
 }
 
 func isDirName(name string) bool {
@@ -51,7 +67,7 @@ func isDirName(name string) bool {
 }
 
 func isCwd(name string) bool {
-	return name == "" || name == "."
+	return name == "" || name == cwdPath
 }
 
 func pathError(op string, name string, err error) error {

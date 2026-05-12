@@ -170,7 +170,7 @@ func initTestGitRepo(t *testing.T, dir string, files map[string]string) error {
 	if err != nil {
 		return err
 	}
-	if err := w.AddGlob("."); err != nil {
+	if err := w.AddGlob(cwdPath); err != nil {
 		return err
 	}
 	_, err = w.Commit("init", &git.CommitOptions{

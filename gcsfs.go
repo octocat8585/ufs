@@ -192,13 +192,13 @@ func (f *gcsFile) Readdir(n int) ([]fs.FileInfo, error) {
 }
 
 func (fsys *gcsFS) Open(name string) (fs.File, error) {
-	if name == "." {
+	if name == cwdPath {
 		entries, err := fsys.listDir("")
 		if err != nil {
-			return nil, pathError("open", ".", err)
+			return nil, pathError("open", cwdPath, err)
 		}
 		return &gcsFile{
-			name:       ".",
+			name:       cwdPath,
 			isDir:      true,
 			dirEntries: entries,
 			fsys:       fsys,
@@ -255,10 +255,10 @@ func (fsys *gcsFS) Open(name string) (fs.File, error) {
 }
 
 // listDir lists the immediate children of a virtual GCS directory.
-// name is the FS-relative path; pass "" or "." for the root.
+// name is the FS-relative path; pass "" or cwdPath for the root.
 func (fsys *gcsFS) listDir(name string) ([]fs.DirEntry, error) {
 	var listPrefix string
-	if name == "" || name == "." {
+	if name == "" || name == cwdPath {
 		if fsys.baseDir != "" {
 			listPrefix = fsys.baseDir + "/"
 		}
@@ -356,7 +356,7 @@ func (fsys *gcsFS) ReadFile(name string) ([]byte, error) {
 }
 
 func (fsys *gcsFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	if name != "." {
+	if name != cwdPath {
 		if err := validPath("readdir", name); err != nil {
 			return nil, err
 		}
@@ -382,7 +382,7 @@ func (fsys *gcsFS) ReadLink(name string) (string, error) {
 }
 
 func (fsys *gcsFS) Lstat(name string) (fs.FileInfo, error) {
-	if name != "." {
+	if name != cwdPath {
 		if err := validPath("lstat", name); err != nil {
 			return nil, err
 		}
@@ -449,7 +449,7 @@ func gcsJoin(parts ...string) string {
 		path = after
 	}
 	path = coerceUnix(filepath.Clean(path))
-	if path == "." {
+	if path == cwdPath {
 		return prefix
 	}
 	return prefix + path
