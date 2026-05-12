@@ -32,10 +32,6 @@ var (
 	_ fs.StatFS     = (*nestFS)(nil)
 )
 
-func removePathComponent(name string, mountPath string) string {
-	return strings.TrimLeft(strings.TrimPrefix(name, mountPath), "\\/")
-}
-
 func getPotentialArchives(name string) []string {
 	components := strings.Split(name, string(os.PathSeparator))
 	potentials := []string{}
@@ -87,8 +83,8 @@ func (fsys *nestFS) getFSAndSubpath(name string) (*nestFS, string, error) {
 	targetFS := fsys
 	targetName := name
 	for mountPath, subFS := range fsys.fsMap {
-		subPath := removePathComponent(name, mountPath)
-		if len(subPath) < len(targetName) {
+		subPath, ok := removePathPrefix(mountPath, name)
+		if ok && len(subPath) < len(targetName) {
 			targetName = subPath
 			targetFS = subFS
 		}
@@ -99,7 +95,10 @@ func (fsys *nestFS) getFSAndSubpath(name string) (*nestFS, string, error) {
 		archiveName := strings.TrimSuffix(archiveDirName, archiveDirExt)
 		info, err := targetFS.Stat(archiveName)
 		if info != nil && err == nil {
-			subPath := removePathComponent(targetName, archiveDirName)
+			subPath, ok := removePathPrefix(archiveDirName, targetName)
+			if !ok {
+
+			}
 			subFS, err := targetFS.mountArchive(archiveName)
 			if err != nil {
 				return nil, "", pathError("mount", name, fmt.Errorf("cannot mount archive %s, %w", archiveName, err))

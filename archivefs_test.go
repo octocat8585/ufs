@@ -206,7 +206,7 @@ func TestArchiveFSReadDir(t *testing.T) {
 		t.Fatal("archiveFS does not implement fs.ReadDirFS")
 	}
 
-	entries, err := rfs.ReadDir(".")
+	entries, err := rfs.ReadDir(cwdPath)
 	if err != nil {
 		t.Fatalf("ReadDir(\".\") = %v, want nil", err)
 	}

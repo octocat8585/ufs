@@ -112,7 +112,7 @@ func globFS(fsys fs.ReadDirFS, pattern string) ([]string, error) {
 	if _, err := path.Match(pattern, ""); err != nil {
 		return nil, err
 	}
-	return globWalk(fsys, ".", pattern)
+	return globWalk(fsys, cwdPath, pattern)
 }
 
 func globWalk(fsys fs.ReadDirFS, dir, pattern string) ([]string, error) {
@@ -134,7 +134,7 @@ func globWalk(fsys fs.ReadDirFS, dir, pattern string) ([]string, error) {
 			continue
 		}
 		entryPath := e.Name()
-		if dir != "." {
+		if dir != cwdPath {
 			entryPath = dir + "/" + e.Name()
 		}
 		if rest == "" {

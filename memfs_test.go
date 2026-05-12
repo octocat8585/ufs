@@ -421,7 +421,7 @@ func TestMemFSLstat(t *testing.T) {
 	})
 
 	t.Run("root", func(t *testing.T) {
-		info, err := lfs.Lstat(".")
+		info, err := lfs.Lstat(cwdPath)
 		if err != nil {
 			t.Fatalf("Lstat(.) = %v, want nil", err)
 		}
@@ -467,7 +467,7 @@ func TestMemFSReadDir(t *testing.T) {
 	})
 
 	t.Run("root", func(t *testing.T) {
-		entries, err := dfs.ReadDir(".")
+		entries, err := dfs.ReadDir(cwdPath)
 		if err != nil {
 			t.Fatalf("ReadDir(.) = %v, want nil", err)
 		}

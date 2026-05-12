@@ -96,7 +96,7 @@ func TestNullFSLstat(t *testing.T) {
 
 func TestNullFSReadDir(t *testing.T) {
 	nfs := makeNullFS()
-	entries, err := nfs.ReadDir(".")
+	entries, err := nfs.ReadDir(cwdPath)
 	if err != nil {
 		t.Fatalf("ReadDir() = %v, want nil", err)
 	}

@@ -17,7 +17,6 @@ package ufs
 import (
 	"io"
 	"io/fs"
-	"time"
 )
 
 var (
@@ -43,7 +42,7 @@ func (n *nullFile) Stat() (fs.FileInfo, error) {
 		name:    n.name,
 		size:    0,
 		mode:    mode,
-		modTime: time.Time{},
+		modTime: unixEpochTime,
 		isDir:   isDir,
 		sys:     nil,
 	}, nil
@@ -135,7 +134,7 @@ func (fsys *nullFS) Lstat(name string) (fs.FileInfo, error) {
 		name:    name,
 		size:    0,
 		mode:    mode,
-		modTime: time.Time{},
+		modTime: unixEpochTime,
 		isDir:   isDir,
 		sys:     nil,
 	}, nil
