@@ -103,6 +103,31 @@ func TestNullFSReadDir(t *testing.T) {
 	if len(entries) != 0 {
 		t.Errorf("ReadDir() = %d entries, want 0", len(entries))
 	}
+	f, err := nfs.Open(".")
+	if err != nil {
+		t.Errorf("Open('.') returned error, %s", err)
+	}
+	rdf, ok := f.(fs.ReadDirFile)
+	if ok {
+		if readBytes, err := rdf.Read(nil); err == nil || readBytes != 0 {
+			t.Errorf("fs.ReadDirFile.Read() want: (0, error) got: (%d, %s)", readBytes, err)
+		}
+		if dirs, err := rdf.ReadDir(-1); err != nil {
+			t.Errorf("fs.ReadDirFile.ReadDir(-1) returned error, %s", err)
+		} else if len(dirs) != 0 {
+			t.Errorf("fs.ReadDirFile.ReadDir(-1) want: [], got: %v", dirs)
+		}
+		if stat, err := rdf.Stat(); err != nil {
+			t.Errorf("fs.ReadDirFile.Stat() returned error, %s", err)
+		} else if stat != nullDirStat {
+			t.Errorf("fs.ReadDirFile.Stat() want: %v, got: %v", nullDirStat, stat)
+		}
+		if err := rdf.Close(); err != nil {
+			t.Errorf("fs.ReadDirFile returned error, %s", err)
+		}
+	} else {
+		t.Errorf("%+v is not a fs.ReadDirFile", rdf)
+	}
 }
 
 func TestNullFSGlob(t *testing.T) {

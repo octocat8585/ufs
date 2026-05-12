@@ -15,17 +15,28 @@
 package ufs
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
 )
 
 var (
-	_ File          = (*nullFile)(nil)
-	_ FS            = (*nullFS)(nil)
-	_ fs.ReadFileFS = (*nullFS)(nil)
-	_ fs.ReadDirFS  = (*nullFS)(nil)
-	_ fs.ReadLinkFS = (*nullFS)(nil)
-	_ fs.GlobFS     = (*nullFS)(nil)
+	_ File           = (*nullFile)(nil)
+	_ FS             = (*nullFS)(nil)
+	_ fs.ReadFileFS  = (*nullFS)(nil)
+	_ fs.ReadDirFS   = (*nullFS)(nil)
+	_ fs.ReadLinkFS  = (*nullFS)(nil)
+	_ fs.GlobFS      = (*nullFS)(nil)
+	_ fs.ReadDirFile = (*nullReadDirFile)(nil)
+
+	nullDirStat = &fsInfo{
+		name:    "",
+		size:    0,
+		mode:    fs.ModeDir | fs.ModePerm,
+		modTime: unixEpochTime,
+		isDir:   true,
+		sys:     nil,
+	}
 )
 
 type nullFile struct {
@@ -78,12 +89,34 @@ func newNullFile(name string) *nullFile {
 	}
 }
 
+type nullReadDirFile struct {
+}
+
+func (vrd *nullReadDirFile) Stat() (fs.FileInfo, error) {
+	return nullDirStat, nil
+}
+
+func (vrd *nullReadDirFile) Read(p []byte) (int, error) {
+	return 0, fmt.Errorf("read '': is a directory")
+}
+
+func (vrd *nullReadDirFile) Close() error {
+	return nil
+}
+
+func (vrd *nullReadDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
+	return []fs.DirEntry{}, nil
+}
+
 type nullFS struct {
 }
 
 func (fsys *nullFS) Open(name string) (fs.File, error) {
 	if err := validPath("open", name); err != nil {
 		return nil, err
+	}
+	if isDirName(name) {
+		return &nullReadDirFile{}, nil
 	}
 	return newNullFile(name), nil
 }
