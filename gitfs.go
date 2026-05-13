@@ -45,17 +45,13 @@ func prepareGitDirectory(name string, gitURL string) error {
 }
 
 func newGitFS(name string) (FS, error) {
-	if !isSupportedGit(name) {
+	if !isGitFSUri(name) {
 		return nil, fmt.Errorf("%q is not a valid git repository", name)
 	}
 
 	return newTempMountFS(name, func(tempDir string) error {
 		return prepareGitDirectory(tempDir, name)
 	})
-}
-
-func isSupportedGit(filePath string) bool {
-	return strings.HasSuffix(strings.ToLower(filePath), ".git")
 }
 
 func cloneOptions(filePath string) []*git.CloneOptions {
@@ -74,4 +70,8 @@ func cloneOptions(filePath string) []*git.CloneOptions {
 			ReferenceName: plumbing.NewBranchReferenceName("main"),
 		},
 	}
+}
+
+func isGitFSUri(uri string) bool {
+	return strings.HasSuffix(strings.ToLower(uri), ".git")
 }

@@ -28,7 +28,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-func TestIsSupportedGit(t *testing.T) {
+func TestIsGitFSUri(t *testing.T) {
 	tests := []struct {
 		path string
 		want bool
@@ -47,9 +47,9 @@ func TestIsSupportedGit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			got := isSupportedGit(tt.path)
+			got := isGitFSUri(tt.path)
 			if got != tt.want {
-				t.Errorf("isSupportedGit(%q) = %v, want %v", tt.path, got, tt.want)
+				t.Errorf("isGitFSUri(%q) = %v, want %v", tt.path, got, tt.want)
 			}
 		})
 	}

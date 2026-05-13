@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -80,19 +81,26 @@ func New(name string) (FS, error) {
 }
 
 func newBaseFS(name string) (FS, error) {
-	if strings.HasPrefix(name, "memory:") {
+	ctx := context.Background()
+	if isMemFSUri(name) {
 		return newMemFS(name)
 	}
-	if strings.HasPrefix(name, "angry:") {
+	if isAngryFSUri(name) {
 		return newAngryFS(name)
 	}
-	if strings.HasPrefix(name, "null:") {
+	if isNullFSUri(name) {
 		return newNullFS(name)
 	}
-	if strings.HasPrefix(name, "file:") {
+	if isGitFSUri(name) {
+		return newGitFS(name)
+	}
+	if isLocalFSUri(name) {
+		if isMountableArchivePath(name) {
+			return newArchiveFSFromLocalFS(ctx, name)
+		}
 		return newLocalFS(name)
 	}
-	if strings.HasPrefix(name, "gs:") {
+	if isGCSFSUri(name) {
 		return newGCSFS(name)
 	}
 	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {

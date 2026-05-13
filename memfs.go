@@ -26,6 +26,10 @@ import (
 	"time"
 )
 
+const (
+	memFSPrefix = "memory:"
+)
+
 var (
 	_ File          = (*memFile)(nil)
 	_ FS            = (*memFS)(nil)
@@ -462,4 +466,8 @@ func makeMemFS(name string) *memFS {
 		root: strings.TrimPrefix(name, "memory://"),
 		dir:  memNodeMap{},
 	}
+}
+
+func isMemFSUri(name string) bool {
+	return strings.HasPrefix(name, memFSPrefix)
 }

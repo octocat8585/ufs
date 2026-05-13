@@ -20,6 +20,42 @@ import (
 	"testing"
 )
 
+func TestIsNullFSUri(t *testing.T) {
+	testCases := []struct {
+		name string
+		want bool
+	}{
+		{
+			name: "null:",
+			want: true,
+		},
+		{
+			name: "null://",
+			want: true,
+		},
+		{
+			name: "nullfs://",
+			want: false,
+		},
+		{
+			name: ".",
+			want: false,
+		},
+		{
+			name: "mem://",
+			want: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isNullFSUri(tc.name)
+			if got != tc.want {
+				t.Errorf("got: %t, want: %t", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestNewNullFS(t *testing.T) {
 	fsys, err := newNullFS("null://")
 	if err != nil {

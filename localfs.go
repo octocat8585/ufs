@@ -23,6 +23,10 @@ import (
 	"strings"
 )
 
+const (
+	localFSPrefix = "file:"
+)
+
 var (
 	_ File             = (*os.File)(nil)
 	_ localFSInterface = (*localFS)(nil)
@@ -164,4 +168,8 @@ func newLocalFS(name string) (FS, error) {
 	return &localFS{
 		osFS: osFS,
 	}, nil
+}
+
+func isLocalFSUri(name string) bool {
+	return strings.HasPrefix(name, localFSPrefix) || !strings.Contains(name, "://")
 }

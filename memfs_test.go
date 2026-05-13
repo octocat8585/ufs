@@ -20,6 +20,50 @@ import (
 	"testing"
 )
 
+func TestIsMemFSUri(t *testing.T) {
+	testCases := []struct {
+		name string
+		want bool
+	}{
+		{
+			name: "memory:",
+			want: true,
+		},
+		{
+			name: "memory://",
+			want: true,
+		},
+		{
+			name: "mem:",
+			want: false,
+		},
+		{
+			name: "mem://",
+			want: false,
+		},
+		{
+			name: "memfs://",
+			want: false,
+		},
+		{
+			name: ".",
+			want: false,
+		},
+		{
+			name: "null://",
+			want: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isMemFSUri(tc.name)
+			if got != tc.want {
+				t.Errorf("got: %t, want: %t", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestNewMemFS(t *testing.T) {
 	fsys, err := newMemFS("memory://test")
 	if err != nil {
