@@ -373,6 +373,7 @@ func dirEntryListToNames(entries []fs.DirEntry) []string {
 }
 
 func assertContains(t *testing.T, fsys FS, name string, substr string) {
+	t.Helper()
 	data, err := fs.ReadFile(fsys, name)
 	if err != nil {
 		t.Fatal(err)

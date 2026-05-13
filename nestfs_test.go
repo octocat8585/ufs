@@ -205,7 +205,7 @@ func TestMountMap(t *testing.T) {
 	}
 }
 
-func xTestNestFSFull(t *testing.T) {
+func TestNestFSFull(t *testing.T) {
 	fsys, err := newNestFS(cwdPath)
 	if err != nil {
 		t.Fatal(err)
@@ -215,7 +215,7 @@ func xTestNestFSFull(t *testing.T) {
 	assertContains(t, fsys, "testing/testassets/archives/nested-testassets.zip.d/single-testassets.zip.d/index.html", "testing/testassets/files/index.html")
 }
 
-func xTestNestedFS(t *testing.T) {
+func TestNestedFS(t *testing.T) {
 	fsys, err := New("memory://?a=file:///&mounted/null=null://&mounted/angry=angry://")
 	if err != nil {
 		t.Fatal(err)
@@ -234,7 +234,7 @@ func xTestNestedFS(t *testing.T) {
 		},
 		{
 			dir:         "mounted/null",
-			wantEntries: []string{"."},
+			wantEntries: []string{},
 		},
 	}
 
