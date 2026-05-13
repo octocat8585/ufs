@@ -24,7 +24,7 @@ var (
 )
 
 type tempMountFS struct {
-	lfs    *localFS
+	lfs    fullFS
 	closer func() error
 }
 
@@ -88,7 +88,7 @@ func newTempMountFS(name string, prepare func(string) error) (FS, error) {
 	return makeTempMountFS(lfs.(*localFS), cleanup), nil
 }
 
-func makeTempMountFS(lfs *localFS, closer func() error) *tempMountFS {
+func makeTempMountFS(lfs fullFS, closer func() error) *tempMountFS {
 	return &tempMountFS{
 		lfs:    lfs,
 		closer: closer,

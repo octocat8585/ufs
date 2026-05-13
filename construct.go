@@ -95,6 +95,9 @@ func newBaseFS(name string) (FS, error) {
 	if strings.HasPrefix(name, "gs:") {
 		return newGCSFS(name)
 	}
+	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
+		return newTempMountRemoteArchiveFS(name)
+	}
 
 	stat, err := os.Stat(name)
 	if err == nil && stat != nil {

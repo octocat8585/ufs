@@ -16,9 +16,36 @@ package ufs
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 )
+
+func downloadFile(dir string, uri string) (string, error) {
+	resp, err := http.Get(uri)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	parts := strings.Split(resp.Request.URL.Path, "/")
+	filename := parts[len(parts)-1]
+	archiveFilename := filepath.Join(dir, filename)
+
+	f, err := os.Create(archiveFilename)
+	if err != nil {
+		return archiveFilename, err
+	}
+
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		return archiveFilename, err
+	}
+
+	return archiveFilename, nil
+}
 
 func createOSTempDirectory() (string, func() error, error) {
 	tmpDir, err := os.MkdirTemp(os.TempDir(), "goapp")

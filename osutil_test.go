@@ -36,3 +36,19 @@ func TestCreateOSTempDirectory(t *testing.T) {
 		t.Errorf("'%s' exists when it should not", dir)
 	}
 }
+
+func xTestNewRemoteArchive(t *testing.T) {
+	fsys, err := New("https://github.com/mholt/archives/archive/refs/heads/main.zip")
+	defer fsys.Close()
+
+	if err != nil {
+		t.Error(err)
+	}
+	if files, err := fsys.ReadDir("."); files != nil {
+		t.Logf("files: %v, err: %s", files, err)
+	}
+	if files, err := fsys.ReadDir("archives-main"); files != nil {
+		t.Logf("files: %v, err: %s", files, err)
+	}
+	t.Fail()
+}

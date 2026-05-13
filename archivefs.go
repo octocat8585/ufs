@@ -34,6 +34,7 @@ var (
 	_ FS            = (*archiveFS)(nil)
 	_ fs.ReadFileFS = (*archiveFS)(nil)
 	_ fs.ReadDirFS  = (*archiveFS)(nil)
+	_ fullFS        = (*archiveFS)(nil)
 
 	archiveExtList = []string{".tar", ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz4", ".tar.br", ".tar.zst", ".rar", ".zip", ".7z"}
 )
@@ -92,6 +93,14 @@ func (fsys *archiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return fs.ReadDir(fsys.fsys, name)
 }
 
+func (fsys *archiveFS) ReadLink(name string) (string, error) {
+	return "", pathError("readlink", name, fmt.Errorf("readlink not supported for '%s' in archiveFS", name))
+}
+
+func (fsys *archiveFS) Lstat(name string) (fs.FileInfo, error) {
+	return nil, pathError("lstat", name, fmt.Errorf("lstat not supported for '%s' in archiveFS", name))
+}
+
 func newArchiveFSFromLocalFS(ctx context.Context, name string) (*archiveFS, error) {
 	fsys, err := archives.FileSystem(ctx, name, nil)
 	if err != nil {
@@ -147,4 +156,26 @@ func makeArchiveFS(fsys fs.FS) *archiveFS {
 	return &archiveFS{
 		fsys: fsys,
 	}
+}
+
+func newTempMountRemoteArchiveFS(name string) (FS, error) {
+	tempDir, cleanup, err := createOSTempDirectory()
+	if err != nil {
+		cleanup()
+		return nil, fmt.Errorf("cannot create temp directory, %w", err)
+	}
+
+	filename, err := downloadFile(tempDir, name)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+
+	ctx := context.Background()
+	fsys, err := newArchiveFSFromLocalFS(ctx, filename)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+	return makeTempMountFS(fsys, cleanup), nil
 }
