@@ -45,6 +45,7 @@ type File interface {
 type ReadFS interface {
 	fs.FS
 	io.Closer
+	fs.ReadDirFS
 }
 
 type FS interface {

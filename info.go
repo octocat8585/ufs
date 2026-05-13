@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"fmt"
 	"io/fs"
 	"time"
 )
@@ -98,6 +99,38 @@ func (entry *virtualDirEntry) Sys() any {
 
 func makeVirtualDirEntry(name string) *virtualDirEntry {
 	return &virtualDirEntry{
+		name: name,
+	}
+}
+
+var (
+	_ fs.ReadDirFile = (*readDirFile)(nil)
+)
+
+type readDirFile struct {
+	fsys ReadFS
+	name string
+}
+
+func (rdf *readDirFile) Stat() (fs.FileInfo, error) {
+	return fs.Stat(rdf.fsys, rdf.name)
+}
+
+func (rdf *readDirFile) Read(p []byte) (int, error) {
+	return 0, fmt.Errorf("read '%s: is a directory", rdf.name)
+}
+
+func (rdf *readDirFile) Close() error {
+	return nil
+}
+
+func (rdf *readDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
+	return rdf.fsys.ReadDir(rdf.name)
+}
+
+func makeReadDirFile(fsys ReadFS, name string) *readDirFile {
+	return &readDirFile{
+		fsys: fsys,
 		name: name,
 	}
 }

@@ -18,8 +18,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"sort"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -207,15 +205,6 @@ func TestMountMap(t *testing.T) {
 	}
 }
 
-func toMapKeys[T any](m map[string]T) []string {
-	keys := []string{}
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
 func xTestNestFSFull(t *testing.T) {
 	fsys, err := newNestFS(cwdPath)
 	if err != nil {
@@ -224,16 +213,6 @@ func xTestNestFSFull(t *testing.T) {
 	assertContains(t, fsys, "testing/testassets/files/index.html", "testing/testassets/files/index.html")
 	assertContains(t, fsys, "testing/testassets/archives/nested-testassets.zip.d/site.js", "testing/testassets/files/site.js")
 	assertContains(t, fsys, "testing/testassets/archives/nested-testassets.zip.d/single-testassets.zip.d/index.html", "testing/testassets/files/index.html")
-}
-
-func assertContains(t *testing.T, fsys FS, name string, substr string) {
-	data, err := fs.ReadFile(fsys, name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(data), substr) {
-		t.Errorf("%q does not contain %q, (len: %d) %q", name, substr, len(data), string(data))
-	}
 }
 
 func TestNestFSReadDir(t *testing.T) {
