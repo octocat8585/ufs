@@ -247,16 +247,25 @@ func (fsys *nestFS) Create(name string) (File, error) {
 		return nil, err
 	}
 
-	// TODO:
-	return fsys.fsys.Create(name)
+	mountFS, subName, err := fsys.getFSAndSubpath(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return mountFS.fsys.Create(subName)
 }
 
 func (fsys *nestFS) MkdirAll(name string, perm fs.FileMode) error {
 	if err := fsys.validPath("mkdir", name); err != nil {
 		return err
 	}
-	// TODO:
-	return fsys.fsys.MkdirAll(name, perm)
+
+	mountFS, subName, err := fsys.getFSAndSubpath(name)
+	if err != nil {
+		return err
+	}
+
+	return mountFS.fsys.MkdirAll(subName, perm)
 }
 
 func (fsys *nestFS) ReadDir(name string) ([]fs.DirEntry, error) {
@@ -264,11 +273,16 @@ func (fsys *nestFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		return nil, err
 	}
 
-	if cFsys, ok := fsys.fsys.(fs.ReadDirFS); ok {
-		return cFsys.ReadDir(name)
+	mountFS, subName, err := fsys.getFSAndSubpath(name)
+	if err != nil {
+		return nil, err
 	}
 
-	f, err := fsys.fsys.Open(name)
+	if cFsys, ok := mountFS.fsys.(fs.ReadDirFS); ok {
+		return cFsys.ReadDir(subName)
+	}
+
+	f, err := mountFS.fsys.Open(subName)
 	if err != nil {
 		return nil, err
 	}
@@ -286,10 +300,15 @@ func (fsys *nestFS) Stat(name string) (fs.FileInfo, error) {
 		return nil, err
 	}
 
-	if cFsys, ok := fsys.fsys.(fs.StatFS); ok {
-		return cFsys.Stat(name)
+	mountFS, subName, err := fsys.getFSAndSubpath(name)
+	if err != nil {
+		return nil, err
 	}
-	f, err := fsys.Open(name)
+
+	if cFsys, ok := mountFS.fsys.(fs.StatFS); ok {
+		return cFsys.Stat(subName)
+	}
+	f, err := mountFS.Open(subName)
 	if err != nil {
 		return nil, err
 	}
@@ -317,9 +336,16 @@ func (fsys *nestFS) ReadLink(name string) (string, error) {
 	if err := fsys.validPath("readlink", name); err != nil {
 		return "", err
 	}
-	if cFsys, ok := fsys.fsys.(fs.ReadLinkFS); ok {
-		return cFsys.ReadLink(name)
+
+	mountFS, subName, err := fsys.getFSAndSubpath(name)
+	if err != nil {
+		return "", err
 	}
+
+	if cFsys, ok := mountFS.fsys.(fs.ReadLinkFS); ok {
+		return cFsys.ReadLink(subName)
+	}
+
 	return "", pathError("readlink", name, fs.ErrInvalid)
 }
 
@@ -328,10 +354,15 @@ func (fsys *nestFS) Lstat(name string) (fs.FileInfo, error) {
 		return nil, err
 	}
 
-	if cFsys, ok := fsys.fsys.(fs.ReadLinkFS); ok {
-		return cFsys.Lstat(name)
+	mountFS, subName, err := fsys.getFSAndSubpath(name)
+	if err != nil {
+		return nil, err
 	}
-	return fsys.Stat(name)
+
+	if cFsys, ok := mountFS.fsys.(fs.ReadLinkFS); ok {
+		return cFsys.Lstat(subName)
+	}
+	return mountFS.Stat(subName)
 }
 
 func (fsys *nestFS) Glob(pattern string) ([]string, error) {
