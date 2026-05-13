@@ -20,6 +20,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -350,5 +352,32 @@ func must(tb testing.TB, err error) {
 	tb.Helper()
 	if err != nil {
 		tb.Error(err)
+	}
+}
+
+func toMapKeys[T any](m map[string]T) []string {
+	keys := []string{}
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func dirEntryListToNames(entries []fs.DirEntry) []string {
+	names := make([]string, len(entries))
+	for i, entry := range entries {
+		names[i] = entry.Name()
+	}
+	return names
+}
+
+func assertContains(t *testing.T, fsys FS, name string, substr string) {
+	data, err := fs.ReadFile(fsys, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), substr) {
+		t.Errorf("%q does not contain %q, (len: %d) %q", name, substr, len(data), string(data))
 	}
 }

@@ -16,8 +16,11 @@ package ufs
 
 import (
 	"io/fs"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestInfoDir(t *testing.T) {
@@ -109,5 +112,45 @@ func TestVirtualDirEntry(t *testing.T) {
 	}
 	if entry.Sys() != nil {
 		t.Errorf("Sys() got: %v, want: nil", entry.Sys())
+	}
+}
+
+func TestReadDirFile(t *testing.T) {
+	fsys := makeMemFS("memory:///")
+	must(t, fsys.MkdirAll("a/b/c", fs.ModePerm))
+	must(t, fsys.MkdirAll("d/e/f", fs.ModePerm))
+	must(t, fsys.MkdirAll("g/h/i", fs.ModePerm))
+
+	dirFile := makeReadDirFile(fsys, ".")
+
+	if bytesRead, err := dirFile.Read(nil); bytesRead != 0 || err == nil || !strings.Contains(err.Error(), "is a directory") {
+		t.Errorf("Read() should return (0, 'is a directory') got (%d, %s)", bytesRead, err)
+	}
+
+	entries, err := dirFile.ReadDir(-1)
+	if err != nil {
+		t.Errorf("ReadDir(-1) returned error, %s", err)
+	}
+	wantNames := []string{"a", "d", "g"}
+	gotNames := dirEntryListToNames(entries)
+	if diff := cmp.Diff(wantNames, gotNames); diff != "" {
+		t.Errorf("got %s, want %s diff(-want,+got):\n %v", gotNames, wantNames, diff)
+	}
+
+	stat, err := dirFile.Stat()
+	if err != nil {
+		t.Errorf("Stat() returned error, %s", err)
+	}
+
+	if stat.Name() != "." {
+		t.Errorf("Stat().Name() got %s, want '.'", stat.Name())
+	}
+
+	if stat.Mode()|fs.ModeDir == 0 {
+		t.Errorf("Stat().Mode() is not a directory, got: %s", stat.Mode())
+	}
+
+	if err := dirFile.Close(); err != nil {
+		t.Errorf("Close() returned error, %s", err)
 	}
 }
