@@ -15,8 +15,10 @@
 package ufs
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
+	"sort"
 	"strings"
 	"testing"
 
@@ -40,8 +42,182 @@ func TestNewNestFSInvalid(t *testing.T) {
 	}
 }
 
+func TestMountMap(t *testing.T) {
+	mm := makeMountMap()
+	mfs := makeMemFS("memory:///")
+	afs := makeAngryFS()
+	nfs := makeNullFS()
+
+	must(t, mm.put("mounts/null", makeNestFS(nfs)))
+	must(t, mm.put("mounts/mem", makeNestFS(mfs)))
+	must(t, mm.put("mounts/angry", makeNestFS(afs)))
+	must(t, mm.put("null", makeNestFS(nfs)))
+	must(t, mm.put("mem", makeNestFS(mfs)))
+	must(t, mm.put("angry", makeNestFS(afs)))
+	must(t, mm.put("mounts/level2/a/null", makeNestFS(nfs)))
+	must(t, mm.put("mounts/level2/a/mem", makeNestFS(mfs)))
+	must(t, mm.put("mounts/level2/angry", makeNestFS(afs)))
+	if err := mm.put("mounts/level2/angry/angry", makeNestFS(afs)); err == nil {
+		t.Fatal("'mounts/level2/angry/angry' should not be mountable because of 'mounts/level2/angry'")
+	}
+	if err := mm.put("mounts", makeNestFS(afs)); err == nil {
+		t.Fatal("'mounts' should not be mountable because of 'mounts/null'")
+	}
+
+	testCases := []struct {
+		input                   string
+		wantDirectoryList       []string
+		wantGetMatchesBySubPath []string
+		wantMountPath           string
+		wantMountSubPath        string
+	}{
+		{
+			input:                   "",
+			wantDirectoryList:       []string{"angry", "mem", "mounts", "null"},
+			wantGetMatchesBySubPath: []string{"angry", "mem", "mounts/angry", "mounts/level2/a/mem", "mounts/level2/a/null", "mounts/level2/angry", "mounts/mem", "mounts/null", "null"},
+			wantMountPath:           "",
+			wantMountSubPath:        "",
+		},
+		{
+			input:                   cwdPath,
+			wantDirectoryList:       []string{"angry", "mem", "mounts", "null"},
+			wantGetMatchesBySubPath: []string{"angry", "mem", "mounts/angry", "mounts/level2/a/mem", "mounts/level2/a/null", "mounts/level2/angry", "mounts/mem", "mounts/null", "null"},
+			wantMountPath:           "",
+			wantMountSubPath:        "",
+		},
+		{
+			input:                   "mounts",
+			wantDirectoryList:       []string{"angry", "level2", "mem", "null"},
+			wantGetMatchesBySubPath: []string{"angry", "level2/a/mem", "level2/a/null", "level2/angry", "mem", "null"},
+			wantMountPath:           "",
+			wantMountSubPath:        "",
+		},
+		{
+			input:                   "mounts/level2",
+			wantDirectoryList:       []string{"a", "angry"},
+			wantGetMatchesBySubPath: []string{"a/mem", "a/null", "angry"},
+			wantMountPath:           "",
+			wantMountSubPath:        "",
+		},
+		{
+			input:                   "./mounts/level2",
+			wantDirectoryList:       []string{"a", "angry"},
+			wantGetMatchesBySubPath: []string{"a/mem", "a/null", "angry"},
+			wantMountPath:           "",
+			wantMountSubPath:        "",
+		},
+		{
+			input:                   "mounts/level2/a",
+			wantDirectoryList:       []string{"mem", "null"},
+			wantGetMatchesBySubPath: []string{"mem", "null"},
+			wantMountPath:           "",
+			wantMountSubPath:        "",
+		},
+		{
+			input:                   "mounts/level2/a/null",
+			wantDirectoryList:       []string{},
+			wantGetMatchesBySubPath: []string{""},
+			wantMountPath:           "mounts/level2/a/null",
+			wantMountSubPath:        cwdPath,
+		},
+		{
+			input:                   "mounts/level2/a/null/more",
+			wantDirectoryList:       []string{},
+			wantGetMatchesBySubPath: []string{},
+			wantMountPath:           "mounts/level2/a/null",
+			wantMountSubPath:        "more",
+		},
+		{
+			input:                   "mounts/level2/a/null/.",
+			wantDirectoryList:       []string{},
+			wantGetMatchesBySubPath: []string{""},
+			wantMountPath:           "mounts/level2/a/null",
+			wantMountSubPath:        cwdPath,
+		},
+		{
+			input:                   "./mounts/level2/a/mem/./more/stuff",
+			wantDirectoryList:       []string{},
+			wantGetMatchesBySubPath: []string{},
+			wantMountPath:           "mounts/level2/a/mem",
+			wantMountSubPath:        "more/stuff",
+		},
+		{
+			input:                   "./mounts/level2/a/null/.",
+			wantDirectoryList:       []string{},
+			wantGetMatchesBySubPath: []string{""},
+			wantMountPath:           "mounts/level2/a/null",
+			wantMountSubPath:        cwdPath,
+		},
+		{
+			input:                   "mounts/level3",
+			wantDirectoryList:       []string{},
+			wantGetMatchesBySubPath: []string{},
+			wantMountPath:           "",
+			wantMountSubPath:        "",
+		},
+		{
+			input:                   "mount",
+			wantDirectoryList:       []string{},
+			wantGetMatchesBySubPath: []string{},
+			wantMountPath:           "",
+			wantMountSubPath:        "",
+		},
+		{
+			input:                   "does-not-exist",
+			wantDirectoryList:       []string{},
+			wantGetMatchesBySubPath: []string{},
+			wantMountPath:           "",
+			wantMountSubPath:        "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("getDirectoryList/%s", tc.input), func(t *testing.T) {
+			got := mm.getDirectoryList(tc.input)
+			if diff := cmp.Diff(got, tc.wantDirectoryList); diff != "" {
+				t.Errorf("got: %q, want: %q, diff: %q", got, tc.wantDirectoryList, diff)
+			}
+		})
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("getMatchesBySubPath/%s", tc.input), func(t *testing.T) {
+			matches := mm.getMatchesBySubPath(tc.input)
+			got := toMapKeys(matches)
+			if diff := cmp.Diff(got, tc.wantGetMatchesBySubPath); diff != "" {
+				t.Errorf("got: %q, want: %q, diff: %q", got, tc.wantGetMatchesBySubPath, diff)
+			}
+		})
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("getMount/%s", tc.input), func(t *testing.T) {
+			gotMountPath, gotSubPath, gotFS, ok := mm.getMount(tc.input)
+			wantOk := tc.wantMountPath != ""
+			if ok != wantOk {
+				t.Errorf("getMount(%q) ok got: %t, want: %t, fsys: %v", tc.input, ok, wantOk, gotFS)
+			}
+			if diff := cmp.Diff(gotMountPath, tc.wantMountPath); diff != "" {
+				t.Errorf("got: %q, want: %q, diff: %q", gotSubPath, tc.wantMountSubPath, diff)
+			}
+			if diff := cmp.Diff(gotSubPath, tc.wantMountSubPath); diff != "" {
+				t.Errorf("got: %q, want: %q, diff: %q", gotSubPath, tc.wantMountSubPath, diff)
+			}
+		})
+	}
+}
+
+func toMapKeys[T any](m map[string]T) []string {
+	keys := []string{}
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func xTestNestFSFull(t *testing.T) {
-	fsys, err := newNestFS("/home/coder/project/hand/ufs")
+	fsys, err := newNestFS(cwdPath)
 	if err != nil {
 		t.Fatal(err)
 	}

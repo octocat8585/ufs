@@ -345,3 +345,10 @@ func TestFS(t *testing.T) {
 		})
 	}
 }
+
+func must(tb testing.TB, err error) {
+	tb.Helper()
+	if err != nil {
+		tb.Error(err)
+	}
+}
