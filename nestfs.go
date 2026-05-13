@@ -20,6 +20,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -145,6 +146,42 @@ func makeMountMap() *mountMap {
 type nestFS struct {
 	fsys   FS
 	mounts *mountMap
+}
+
+func (fsys *nestFS) appendDirEntry(name string, entries []fs.DirEntry, err error) ([]fs.DirEntry, error) {
+	if err != nil {
+		return nil, err
+	}
+	appendEntry := map[string]fs.DirEntry{}
+
+	dirs := fsys.mounts.getDirectoryList(name)
+	for _, dir := range dirs {
+		appendEntry[dir] = makeVirtualDirEntry(dir)
+	}
+
+	for _, entry := range entries {
+		if isMountableArchivePath(entry.Name()) {
+			mountName := entry.Name() + ".d"
+			appendEntry[mountName] = &virtualDirEntry{
+				name: mountName,
+			}
+		}
+	}
+	if len(appendEntry) == 0 {
+		return entries, nil
+	}
+	for _, entry := range entries {
+		delete(appendEntry, entry.Name())
+	}
+
+	for _, entry := range appendEntry {
+		entries = append(entries, entry)
+	}
+	slices.SortFunc(entries, func(left fs.DirEntry, right fs.DirEntry) int {
+		return strings.Compare(left.Name(), right.Name())
+	})
+
+	return entries, nil
 }
 
 func (fsys *nestFS) addMount(name string, mountedFS *nestFS) {
