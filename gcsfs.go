@@ -32,16 +32,17 @@ import (
 	"google.golang.org/api/option"
 )
 
+const (
+	minChunkSize = 512 * 1024
+	gcsFSPrefix  = "gs:"
+)
+
 var (
 	_ FS            = (*gcsFS)(nil)
 	_ fs.ReadFileFS = (*gcsFS)(nil)
 	_ fs.ReadDirFS  = (*gcsFS)(nil)
 	_ fs.ReadLinkFS = (*gcsFS)(nil)
 	_ File          = (*gcsFile)(nil)
-)
-
-const (
-	minChunkSize = 512 * 1024
 )
 
 type gcsFS struct {
@@ -470,3 +471,8 @@ func parseGCSPath(path string, op string) (string, string, error) {
 	}
 	return parts[0], "", nil
 }
+
+func isGCSFSUri(name string) bool {
+	return strings.HasPrefix(name, gcsFSPrefix)
+}
+

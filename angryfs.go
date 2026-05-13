@@ -16,6 +16,11 @@ package ufs
 
 import (
 	"io/fs"
+	"strings"
+)
+
+const (
+	angryFSPrefix = "angry:"
 )
 
 var (
@@ -80,4 +85,8 @@ func newAngryFS(name string) (FS, error) {
 
 func makeAngryFS() *angryFS {
 	return &angryFS{}
+}
+
+func isAngryFSUri(name string) bool {
+	return strings.HasPrefix(name, angryFSPrefix)
 }

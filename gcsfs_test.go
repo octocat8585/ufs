@@ -30,6 +30,42 @@ var (
 	fakeUpdatedTime = mustTime("2006-01-02T15:04:05Z")
 )
 
+func TestIsGCSFSUri(t *testing.T) {
+	testCases := []struct {
+		name string
+		want bool
+	}{
+		{
+			name: "gs:",
+			want: true,
+		},
+		{
+			name: "gs://",
+			want: true,
+		},
+		{
+			name: "gsfs://",
+			want: false,
+		},
+		{
+			name: ".",
+			want: false,
+		},
+		{
+			name: "mem://",
+			want: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isGCSFSUri(tc.name)
+			if got != tc.want {
+				t.Errorf("got: %t, want: %t", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestGetChunkSize(t *testing.T) {
 	tests := []struct {
 		size int

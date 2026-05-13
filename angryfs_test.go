@@ -19,6 +19,38 @@ import (
 	"testing"
 )
 
+func TestIsAngryFSUri(t *testing.T) {
+	testCases := []struct {
+		name string
+		want bool
+	}{
+		{
+			name: "angry:",
+			want: true,
+		},
+		{
+			name: "angry://",
+			want: true,
+		},
+		{
+			name: "angryfs://",
+			want: false,
+		},
+		{
+			name: "mem://",
+			want: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isAngryFSUri(tc.name)
+			if got != tc.want {
+				t.Errorf("got: %t, want: %t", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestNewAngryFS(t *testing.T) {
 	fsys, err := newAngryFS("angry://")
 	if err != nil {

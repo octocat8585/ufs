@@ -18,6 +18,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"strings"
+)
+
+const (
+	nullFSPrefix = "null:"
 )
 
 var (
@@ -190,4 +195,8 @@ func newNullFS(name string) (FS, error) {
 
 func makeNullFS() *nullFS {
 	return &nullFS{}
+}
+
+func isNullFSUri(name string) bool {
+	return strings.HasPrefix(name, nullFSPrefix)
 }

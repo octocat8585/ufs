@@ -21,6 +21,50 @@ import (
 	"testing"
 )
 
+func TestIsLocalFSUri(t *testing.T) {
+	testCases := []struct {
+		name string
+		want bool
+	}{
+		{
+			name: "file:",
+			want: true,
+		},
+		{
+			name: "file://",
+			want: true,
+		},
+		{
+			name: "filefs://",
+			want: false,
+		},
+		{
+			name: ".",
+			want: true,
+		},
+		{
+			name: "/root/user",
+			want: true,
+		},
+		{
+			name: "/tmp",
+			want: true,
+		},
+		{
+			name: "mem://",
+			want: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isLocalFSUri(tc.name)
+			if got != tc.want {
+				t.Errorf("got: %t, want: %t", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestLocalFS(t *testing.T) {
 	dir := mustTemp(t)
 	testFileSystem(t, newLocalFS, dir)
