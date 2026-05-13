@@ -215,6 +215,43 @@ func xTestNestFSFull(t *testing.T) {
 	assertContains(t, fsys, "testing/testassets/archives/nested-testassets.zip.d/single-testassets.zip.d/index.html", "testing/testassets/files/index.html")
 }
 
+func xTestNestedFS(t *testing.T) {
+	fsys, err := New("memory://?a=file:///&mounted/null=null://&mounted/angry=angry://")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testCases := []struct {
+		dir         string
+		wantEntries []string
+	}{
+		{
+			dir:         ".",
+			wantEntries: []string{"a", "mounted"},
+		},
+		{
+			dir:         "mounted",
+			wantEntries: []string{"angry", "null"},
+		},
+		{
+			dir:         "mounted/null",
+			wantEntries: []string{"."},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.dir, func(t *testing.T) {
+			entries, err := fs.ReadDir(fsys, tc.dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := dirEntryListToNames(entries)
+			if diff := cmp.Diff(got, tc.wantEntries); diff != "" {
+				t.Errorf("ReadDir(.), got: %v want: %v, diff: %s", got, tc.wantEntries, diff)
+			}
+		})
+	}
+}
+
 func TestNestFSReadDir(t *testing.T) {
 	fsys, err := newNestFS("memory://")
 	if err != nil {
