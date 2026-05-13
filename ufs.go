@@ -20,6 +20,11 @@ import (
 	"io/fs"
 )
 
+type fullFS interface {
+	FSEx
+	FS
+}
+
 // ExFS provides extended functionality from the standard FS.
 type FSEx interface {
 	fs.ReadFileFS
