@@ -103,7 +103,7 @@ func TestNullFSReadDir(t *testing.T) {
 	if len(entries) != 0 {
 		t.Errorf("ReadDir() = %d entries, want 0", len(entries))
 	}
-	f, err := nfs.Open(".")
+	f, err := nfs.Open(cwdPath)
 	if err != nil {
 		t.Errorf("Open('.') returned error, %s", err)
 	}
