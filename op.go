@@ -121,7 +121,7 @@ func list(fsys fs.FS, dir string, includeDirs bool) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		if includeDirs || !d.IsDir() {
+		if (includeDirs || !d.IsDir()) && !isCwd(path) {
 			m[path] = nil
 		}
 		return nil

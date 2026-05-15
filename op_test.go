@@ -33,11 +33,11 @@ func TestRsync(t *testing.T) {
 		t.Run(fsysTC.name, func(t *testing.T) {
 			t.Parallel()
 			fsys := fsysTC.createFS(t)
-			if err := Rsync(srcFS, fsys, "."); err != nil {
+			if err := Rsync(srcFS, fsys, cwdPath); err != nil {
 				t.Errorf("rsync failed with error, %s", err)
 			}
 
-			err := ForEachFilename(srcFS, ".", func(name string) error {
+			err := ForEachFilename(srcFS, cwdPath, func(name string) error {
 				srcData, err := fs.ReadFile(srcFS, name)
 				if err != nil {
 					return fmt.Errorf("cannot read srcFS(%q), %w", name, err)
@@ -68,7 +68,7 @@ func TestRsyncAngry(t *testing.T) {
 
 	destFS := makeAngryFS(angryFSPrefix)
 
-	if err := Rsync(srcFS, destFS, "."); err == nil {
+	if err := Rsync(srcFS, destFS, cwdPath); err == nil {
 		t.Error("rsync expected to fail got nil error")
 	}
 }
@@ -81,11 +81,11 @@ func TestRsyncNull(t *testing.T) {
 
 	destFS := mustNullFS(t)
 
-	if err := Rsync(srcFS, destFS, "."); err != nil {
+	if err := Rsync(srcFS, destFS, cwdPath); err != nil {
 		t.Errorf("rsync expected to succeed, failed with error: %s", err)
 	}
 
-	entries, err := destFS.ReadDir(".")
+	entries, err := destFS.ReadDir(cwdPath)
 	if err != nil {
 		t.Error(err)
 	}
@@ -177,7 +177,7 @@ func TestList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List() = %v, want nil", err)
 	}
-	want := []string{cwdPath, "a.txt", "dir", "dir/b.txt", "dir/c.txt"}
+	want := []string{"a.txt", "dir", "dir/b.txt", "dir/c.txt"}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("List() mismatch (-want +got):\n%s", diff)
 	}

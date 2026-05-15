@@ -245,7 +245,7 @@ func TestNestedFS(t *testing.T) {
 		wantEntries []string
 	}{
 		{
-			dir:         ".",
+			dir:         cwdPath,
 			wantEntries: []string{"a", "mounted"},
 		},
 		{

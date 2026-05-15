@@ -44,7 +44,7 @@ func TestIsLocalFSUri(t *testing.T) {
 		{name: "file:", want: true},
 		{name: "file://", want: true},
 		{name: "filefs://", want: false},
-		{name: ".", want: true},
+		{name: cwdPath, want: true},
 		{name: "/root/user", want: true},
 		{name: "/tmp", want: true},
 		{name: "mem://", want: false},
@@ -147,8 +147,28 @@ func mustLocalFS(tb testing.TB) *localFS {
 	if err != nil {
 		tb.Fatalf("newLocalFS(%q) returned error, %s", dir, err)
 	}
-	if err := Rsync(srcFS, fsys, "."); err != nil {
+	if err := Rsync(srcFS, fsys, cwdPath); err != nil {
 		tb.Fatalf("cannot Rsync from %q to %q", testLocalFSName, dir)
 	}
 	return fsys
+}
+
+func TestLocalFSReadDirDoesNotContainCwd(t *testing.T) {
+	fsys, err := os.OpenRoot(cwdPath)
+	if err != nil {
+		t.Error(err)
+	}
+	f, err := fsys.Open(cwdPath)
+	if err != nil {
+		t.Error(err)
+	}
+	entries, err := f.ReadDir(-1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.Name() == cwdPath {
+			t.Errorf("entry list contains '.', %v", entries)
+		}
+	}
 }

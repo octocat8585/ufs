@@ -98,13 +98,13 @@ var (
 	}
 
 	testassetFilenameList = []string{
-		".",
+		cwdPath,
 		"files/index.html",
 		"archives/nested-testassets.zip",
 	}
 
 	testassetDirList = map[string][]string{
-		".":        []string{},
+		cwdPath:    []string{},
 		"files":    []string{},
 		"archives": []string{},
 	}

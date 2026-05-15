@@ -46,7 +46,7 @@ func TestIsMemFSUri(t *testing.T) {
 			want: false,
 		},
 		{
-			name: ".",
+			name: cwdPath,
 			want: false,
 		},
 		{

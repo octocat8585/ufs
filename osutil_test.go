@@ -44,7 +44,7 @@ func TestNewRemoteArchive(t *testing.T) {
 	}
 	defer fsys.Close()
 
-	if files, err := fsys.ReadDir("."); files != nil {
+	if files, err := fsys.ReadDir(cwdPath); files != nil {
 		t.Logf("files: %v, err: %s", files, err)
 	}
 	if files, err := fsys.ReadDir("archives-main"); files != nil {

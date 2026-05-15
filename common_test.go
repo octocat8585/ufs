@@ -19,6 +19,7 @@ import (
 	"io/fs"
 	"reflect"
 	"testing"
+	"testing/fstest"
 )
 
 func TestInvalidPath(t *testing.T) {
@@ -104,5 +105,32 @@ func assertInvalidPathError(t *testing.T, path string, err error, wantOp string)
 		}
 	} else {
 		t.Errorf("%q is not a *fs.PathError, got: %q", err, reflect.TypeOf(err).Name())
+	}
+}
+
+func TestFSConventions(t *testing.T) {
+	srcFS, err := newLocalFS(testLocalFSName)
+	if err != nil {
+		t.Fatalf("cannot mount localFS(%q), %s", testLocalFSName, err)
+	}
+	for _, fsysTC := range getReadWriteTestCaseList() {
+		t.Run(fsysTC.name, func(t *testing.T) {
+			t.Parallel()
+			fsys := fsysTC.createFS(t)
+			if err := Rsync(srcFS, fsys, cwdPath); err != nil {
+				t.Errorf("rsync failed with error, %s", err)
+			}
+
+			allFilenames, err := List(srcFS, cwdPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(allFilenames) == 0 {
+				t.Fatal("expected at least 1 file name")
+			}
+			if err := fstest.TestFS(fsys, allFilenames...); err != nil {
+				t.Error(err)
+			}
+		})
 	}
 }
