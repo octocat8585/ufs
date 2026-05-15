@@ -242,9 +242,9 @@ func TestRemovePathPrefix(t *testing.T) {
 			wantOk:     true,
 		},
 		{
-			path:       ".",
+			path:       cwdPath,
 			removePath: "abc/def",
-			want:       ".",
+			want:       cwdPath,
 			wantOk:     false,
 		},
 		{
@@ -268,7 +268,7 @@ func TestRemovePathPrefix(t *testing.T) {
 		{
 			path:       "abc/def",
 			removePath: "abc/def",
-			want:       ".",
+			want:       cwdPath,
 			wantOk:     true,
 		},
 		{
