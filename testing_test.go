@@ -88,7 +88,7 @@ var (
 		{
 			name: "nullFS",
 			createFS: func(tb testing.TB) FS {
-				fsys := makeNullFS()
+				fsys := makeNullFS(nullFSPrefix)
 				tb.Cleanup(func() {
 					fsys.Close()
 				})
@@ -111,6 +111,10 @@ var (
 
 	testassetCreateFileList = []string{"a.txt", "b.txt", "a/b.txt"}
 )
+
+func getReadWriteTestCaseList() []fsTestCase {
+	return readWriteFSTestCaseList
+}
 
 func getAllTestCaseList() []fsTestCase {
 	return append(append(readOnlyFSTestCaseList, readWriteFSTestCaseList...), angryFSTestCase)

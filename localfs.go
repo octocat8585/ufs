@@ -44,6 +44,10 @@ type localFS struct {
 	osFS *os.Root
 }
 
+func (fsys *localFS) String() string {
+	return fsys.osFS.Name()
+}
+
 func (fsys *localFS) getAbsPath(name string) (string, error) {
 	return filepath.Abs(filepath.Join(fsys.osFS.Name(), name))
 }
@@ -164,7 +168,7 @@ func globWalk(fsys fs.ReadDirFS, dir, pattern string) ([]string, error) {
 	return matches, nil
 }
 
-func newLocalFS(name string) (FS, error) {
+func makeLocalFS(name string) (*localFS, error) {
 	name = strings.TrimPrefix(name, "file://")
 	absPath, err := filepath.Abs(name)
 	if err != nil {
@@ -177,6 +181,10 @@ func newLocalFS(name string) (FS, error) {
 	return &localFS{
 		osFS: osFS,
 	}, nil
+}
+
+func newLocalFS(name string) (FS, error) {
+	return makeLocalFS(name)
 }
 
 func isLocalFSUri(name string) bool {

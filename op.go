@@ -17,8 +17,24 @@ package ufs
 import (
 	"io"
 	"io/fs"
+	"path/filepath"
 	"sort"
 )
+
+// Rsync copies a directory structure of the source file system to the destination file system.
+func Rsync(srcFS fs.FS, destFS FS, dir string) error {
+	return ForEachFilename(srcFS, dir, func(name string) error {
+		dir, _ := filepath.Split(name)
+		dir = filepath.Clean(dir)
+		if err := destFS.MkdirAll(dir, fs.ModePerm); err != nil {
+			return err
+		}
+		if err := Copy(srcFS, name, destFS, name); err != nil {
+			return err
+		}
+		return nil
+	})
+}
 
 // Copy a file from one file system to another.
 func Copy(srcFS fs.FS, srcFilename string, destFS FS, destFilename string) error {

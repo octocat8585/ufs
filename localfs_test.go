@@ -18,42 +18,36 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+const (
+	testLocalFSName = "testing/testassets"
+)
+
+func TestLocalFSString(t *testing.T) {
+	fsys, err := makeLocalFS(testLocalFSName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fsys.String(); !strings.HasSuffix(got, testLocalFSName) {
+		t.Errorf("String() should end with %q, got: %q", testLocalFSName, got)
+	}
+}
 
 func TestIsLocalFSUri(t *testing.T) {
 	testCases := []struct {
 		name string
 		want bool
 	}{
-		{
-			name: "file:",
-			want: true,
-		},
-		{
-			name: "file://",
-			want: true,
-		},
-		{
-			name: "filefs://",
-			want: false,
-		},
-		{
-			name: ".",
-			want: true,
-		},
-		{
-			name: "/root/user",
-			want: true,
-		},
-		{
-			name: "/tmp",
-			want: true,
-		},
-		{
-			name: "mem://",
-			want: false,
-		},
+		{name: "file:", want: true},
+		{name: "file://", want: true},
+		{name: "filefs://", want: false},
+		{name: ".", want: true},
+		{name: "/root/user", want: true},
+		{name: "/tmp", want: true},
+		{name: "mem://", want: false},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -141,4 +135,20 @@ func TestLocalFSReadLink(t *testing.T) {
 	if got != "target.txt" {
 		t.Errorf("ReadLink = %q, want %q", got, "target.txt")
 	}
+}
+
+func mustLocalFS(tb testing.TB) *localFS {
+	dir := mustTemp(tb)
+	srcFS, err := makeLocalFS(testLocalFSName)
+	if err != nil {
+		tb.Fatalf("newLocalFS(%q) returned error, %s", testLocalFSName, err)
+	}
+	fsys, err := makeLocalFS(dir)
+	if err != nil {
+		tb.Fatalf("newLocalFS(%q) returned error, %s", dir, err)
+	}
+	if err := Rsync(srcFS, fsys, "."); err != nil {
+		tb.Fatalf("cannot Rsync from %q to %q", testLocalFSName, dir)
+	}
+	return fsys
 }
