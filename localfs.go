@@ -68,6 +68,9 @@ func (fsys *localFS) Create(name string) (File, error) {
 }
 
 func (fsys *localFS) MkdirAll(name string, perm fs.FileMode) error {
+	if err := validPath("mkdir", name); err != nil {
+		return err
+	}
 	return fsys.osFS.MkdirAll(name, perm)
 }
 
@@ -79,10 +82,16 @@ func (fsys *localFS) ReadFile(name string) ([]byte, error) {
 }
 
 func (fsys *localFS) ReadLink(name string) (string, error) {
+	if err := validPath("readlink", name); err != nil {
+		return "", err
+	}
 	return fsys.osFS.Readlink(name)
 }
 
 func (fsys *localFS) Lstat(name string) (fs.FileInfo, error) {
+	if err := validPath("lstat", name); err != nil {
+		return nil, err
+	}
 	return fsys.osFS.Lstat(name)
 }
 

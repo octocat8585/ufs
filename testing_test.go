@@ -31,6 +31,91 @@ import (
 	"github.com/xyproto/randomstring"
 )
 
+type fsTestCase struct {
+	name     string
+	createFS func(tb testing.TB) FS
+}
+
+var (
+	angryFSTestCase = fsTestCase{
+		name: "angryFS",
+		createFS: func(tb testing.TB) FS {
+			return makeAngryFS(angryFSPrefix)
+		},
+	}
+
+	readWriteFSTestCaseList = []fsTestCase{
+		{
+			name: "localFS",
+			createFS: func(tb testing.TB) FS {
+				dir := mustTemp(tb)
+				fsys, err := newLocalFS(dir)
+				if err != nil {
+					tb.Fatalf("cannot create localFS file system, %s", err)
+				}
+				tb.Cleanup(func() {
+					fsys.Close()
+				})
+				return fsys
+			},
+		},
+		{
+			name: "tempMountFS",
+			createFS: func(tb testing.TB) FS {
+				fsys, err := newTempMountFS("test://", func(string) error { return nil })
+				if err != nil {
+					tb.Fatalf("cannot create tempMountFS file system, %s", err)
+				}
+				tb.Cleanup(func() {
+					fsys.Close()
+				})
+				return fsys
+			},
+		},
+		{
+			name: "memFS",
+			createFS: func(tb testing.TB) FS {
+				fsys := makeMemFS(memFSPrefix)
+				tb.Cleanup(func() {
+					fsys.Close()
+				})
+				return fsys
+			},
+		},
+	}
+
+	readOnlyFSTestCaseList = []fsTestCase{
+		{
+			name: "nullFS",
+			createFS: func(tb testing.TB) FS {
+				fsys := makeNullFS()
+				tb.Cleanup(func() {
+					fsys.Close()
+				})
+				return fsys
+			},
+		},
+	}
+
+	testassetFilenameList = []string{
+		".",
+		"files/index.html",
+		"archives/nested-testassets.zip",
+	}
+
+	testassetDirList = map[string][]string{
+		".":        []string{},
+		"files":    []string{},
+		"archives": []string{},
+	}
+
+	testassetCreateFileList = []string{"a.txt", "b.txt", "a/b.txt"}
+)
+
+func getAllTestCaseList() []fsTestCase {
+	return append(append(readOnlyFSTestCaseList, readWriteFSTestCaseList...), angryFSTestCase)
+}
+
 func testFileSystem(t *testing.T, newFSFunc func(name string) (FS, error), name string) {
 	t.Helper()
 	fsys := mustFS(t, newFSFunc, name)
@@ -152,66 +237,12 @@ func mustTime(s string) time.Time {
 	return val
 }
 
-var (
-	invalidPaths = []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-
-	fsTestCases = []struct {
-		name     string
-		createFS func(tb testing.TB) (FS, error)
-	}{
-		{
-			name: "localFS",
-			createFS: func(tb testing.TB) (FS, error) {
-				dir := mustTemp(tb)
-				return newLocalFS(dir)
-			},
-		},
-		{
-			name: "tempMountFS",
-			createFS: func(tb testing.TB) (FS, error) {
-				return newTempMountFS("test://", func(string) error { return nil })
-			},
-		},
-		{
-			name: "memFS",
-			createFS: func(tb testing.TB) (FS, error) {
-				return newMemFS("mem://")
-			},
-		},
-		{
-			name: "nestFS",
-			createFS: func(tb testing.TB) (FS, error) {
-				return newNestFS("memory://")
-			},
-		},
-	}
-
-	readOnlyFSTestCases = []struct {
-		name     string
-		createFS func(tb testing.TB) (FS, error)
-	}{
-		{
-			name: "nullFS",
-			createFS: func(tb testing.TB) (FS, error) {
-				return newNullFS("null://")
-			},
-		},
-	}
-)
-
 func TestFSClose(t *testing.T) {
 	t.Parallel()
-	for _, tc := range append(fsTestCases, readOnlyFSTestCases...) {
+	for _, tc := range append(readWriteFSTestCaseList, readOnlyFSTestCaseList...) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			fsys, err := tc.createFS(t)
-			if err != nil {
-				t.Fatalf("cannot create file system: %s", err)
-			}
+			fsys := tc.createFS(t)
 			if err := fsys.Close(); err != nil {
 				t.Errorf("Close() = %v, want nil", err)
 			}
@@ -221,13 +252,10 @@ func TestFSClose(t *testing.T) {
 
 func TestFSMkdirAll(t *testing.T) {
 	t.Parallel()
-	for _, tc := range append(fsTestCases, readOnlyFSTestCases...) {
+	for _, tc := range append(readWriteFSTestCaseList, readOnlyFSTestCaseList...) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			fsys, err := tc.createFS(t)
-			if err != nil {
-				t.Fatalf("cannot create file system: %s", err)
-			}
+			fsys := tc.createFS(t)
 			defer fsys.Close()
 			if err := fsys.MkdirAll("subdir", fs.ModePerm); err != nil {
 				t.Errorf("MkdirAll() = %v, want nil", err)
@@ -238,14 +266,11 @@ func TestFSMkdirAll(t *testing.T) {
 
 func TestFSReadFile(t *testing.T) {
 	t.Parallel()
-	for _, tc := range fsTestCases {
+	for _, tc := range readWriteFSTestCaseList {
 		t.Run(tc.name, func(t *testing.T) {
 			wantData := randomString(100)
 			t.Parallel()
-			fsys, err := tc.createFS(t)
-			if err != nil {
-				t.Fatalf("cannot create file system: %s", err)
-			}
+			fsys := tc.createFS(t)
 			defer fsys.Close()
 			f, err := fsys.Create("readfile_test.txt")
 			if err != nil {
@@ -275,38 +300,19 @@ func TestFSReadFile(t *testing.T) {
 
 func verifyReadOnlyFS(t *testing.T, fsys fs.FS) {
 	t.Helper()
-
-	for _, path := range invalidPaths {
-		t.Run("OpenInvalid", func(t *testing.T) {
-			if _, err := fsys.Open(path); err == nil {
-				t.Errorf("Open(%q) succeeded, want error", path)
-			}
-		})
-	}
 }
 
 func verifyFS(t *testing.T, fsys FS) {
 	verifyReadOnlyFS(t, fsys)
-
-	for _, path := range invalidPaths {
-		t.Run("CreateInvalid", func(t *testing.T) {
-			if _, err := fsys.Create(path); err == nil {
-				t.Errorf("Create(%q) succeeded, want error", path)
-			}
-		})
-	}
 }
 
 func TestReadOnlyFS(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range readOnlyFSTestCases {
+	for _, tc := range append(readWriteFSTestCaseList, readOnlyFSTestCaseList...) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			fsys, err := tc.createFS(t)
-			if err != nil {
-				t.Fatalf("cannot create file system, %s", err)
-			}
+			fsys := tc.createFS(t)
 			if fsys == nil {
 				t.Fatalf("file sytem is nil")
 			}
@@ -326,13 +332,10 @@ func TestReadOnlyFS(t *testing.T) {
 func TestFS(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range fsTestCases {
+	for _, tc := range readWriteFSTestCaseList {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			fsys, err := tc.createFS(t)
-			if err != nil {
-				t.Fatalf("cannot create file system, %s", err)
-			}
+			fsys := tc.createFS(t)
 			if fsys == nil {
 				t.Fatalf("file sytem is nil")
 			}

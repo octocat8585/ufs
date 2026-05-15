@@ -20,6 +20,10 @@ import (
 	"io/fs"
 )
 
+type stringer interface {
+	String() string
+}
+
 type fullFS interface {
 	FSEx
 	FS

@@ -418,6 +418,9 @@ func (fsys *memFS) Lstat(name string) (fs.FileInfo, error) {
 }
 
 func (fsys *memFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if err := validPath("readdir", name); err != nil {
+		return nil, err
+	}
 	f, err := fsys.Open(name)
 	if err != nil {
 		return nil, err
