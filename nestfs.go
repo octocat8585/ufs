@@ -264,10 +264,18 @@ func (fsys *nestFS) Open(name string) (fs.File, error) {
 	}
 
 	f, err := mountFS.fsys.Open(subName)
-	if rdf, ok := f.(fs.ReadDirFile); ok {
-		return makeNestReadDirFile(mountFS, subName, rdf), nil
+	if err != nil {
+		return nil, err
 	}
-	return f, err
+
+	if rdf, ok := f.(fs.ReadDirFile); ok {
+		info, statErr := f.Stat()
+		if statErr == nil && info.IsDir() {
+			return makeNestReadDirFile(mountFS, subName, rdf), nil
+		}
+	}
+
+	return f, nil
 }
 
 func (fsys *nestFS) Close() error {
