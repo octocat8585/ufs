@@ -106,19 +106,3 @@ func assertInvalidPathError(t *testing.T, path string, err error, wantOp string)
 		t.Errorf("%q is not a *fs.PathError, got: %q", err, reflect.TypeOf(err).Name())
 	}
 }
-
-func TestRsync(t *testing.T) {
-	srcFS, err := newLocalFS(testLocalFSName)
-	if err != nil {
-		t.Fatalf("cannot mount localFS(%q), %s", testLocalFSName, err)
-	}
-	for _, fsysTC := range getReadWriteTestCaseList() {
-		t.Run(fsysTC.name, func(t *testing.T) {
-			//t.Parallel()
-			fsys := fsysTC.createFS(t)
-			if err := Rsync(srcFS, fsys, "."); err != nil {
-				t.Errorf("rsync failed with error, %s", err)
-			}
-		})
-	}
-}

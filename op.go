@@ -26,7 +26,7 @@ func Rsync(srcFS fs.FS, destFS FS, dir string) error {
 	return ForEachFilename(srcFS, dir, func(name string) error {
 		dir, _ := filepath.Split(name)
 		dir = filepath.Clean(dir)
-		if err := destFS.MkdirAll(dir, fs.ModeDir); err != nil {
+		if err := destFS.MkdirAll(dir, fs.ModePerm); err != nil {
 			return err
 		}
 		if err := Copy(srcFS, name, destFS, name); err != nil {

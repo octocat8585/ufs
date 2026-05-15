@@ -44,7 +44,7 @@ func TestMountMap(t *testing.T) {
 	mm := makeMountMap()
 	mfs := makeMemFS("memory:///")
 	afs := makeAngryFS(angryFSPrefix)
-	nfs := makeNullFS()
+	nfs := mustNullFS(t)
 
 	must(t, mm.put("mounts/null", makeNestFS(nfs)))
 	must(t, mm.put("mounts/mem", makeNestFS(mfs)))

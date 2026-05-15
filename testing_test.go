@@ -88,7 +88,7 @@ var (
 		{
 			name: "nullFS",
 			createFS: func(tb testing.TB) FS {
-				fsys := makeNullFS()
+				fsys := makeNullFS(nullFSPrefix)
 				tb.Cleanup(func() {
 					fsys.Close()
 				})

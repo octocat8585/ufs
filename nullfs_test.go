@@ -20,6 +20,13 @@ import (
 	"testing"
 )
 
+func TestNullFSString(t *testing.T) {
+	fsys := makeNullFS(nullFSPrefix)
+	if got := fsys.String(); got != nullFSPrefix {
+		t.Errorf("String() want: %q got: %q", nullFSPrefix, got)
+	}
+}
+
 func TestIsNullFSUri(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -87,7 +94,7 @@ func TestNewNullFS(t *testing.T) {
 }
 
 func TestNullFSReadFile(t *testing.T) {
-	nfs := makeNullFS()
+	nfs := mustNullFS(t)
 	got, err := nfs.ReadFile("foo.txt")
 	if err != nil {
 		t.Fatalf("ReadFile() = %v, want nil", err)
@@ -98,7 +105,7 @@ func TestNullFSReadFile(t *testing.T) {
 }
 
 func TestNullFSReadLink(t *testing.T) {
-	nfs := makeNullFS()
+	nfs := mustNullFS(t)
 	_, err := nfs.ReadLink("link.txt")
 	if err == nil {
 		t.Fatal("ReadLink() = nil error, want error (nullFS has no symlinks)")
@@ -106,7 +113,7 @@ func TestNullFSReadLink(t *testing.T) {
 }
 
 func TestNullFSLstat(t *testing.T) {
-	nfs := makeNullFS()
+	nfs := mustNullFS(t)
 
 	t.Run("file", func(t *testing.T) {
 		info, err := nfs.Lstat("foo.txt")
@@ -131,7 +138,7 @@ func TestNullFSLstat(t *testing.T) {
 }
 
 func TestNullFSReadDir(t *testing.T) {
-	nfs := makeNullFS()
+	nfs := mustNullFS(t)
 	entries, err := nfs.ReadDir(cwdPath)
 	if err != nil {
 		t.Fatalf("ReadDir() = %v, want nil", err)
@@ -167,7 +174,7 @@ func TestNullFSReadDir(t *testing.T) {
 }
 
 func TestNullFSGlob(t *testing.T) {
-	nfs := makeNullFS()
+	nfs := mustNullFS(t)
 	matches, err := nfs.Glob("*.txt")
 	if err != nil {
 		t.Fatalf("Glob() = %v, want nil", err)
@@ -300,4 +307,8 @@ func TestNullFileOperations(t *testing.T) {
 	if info.Mode() != fs.ModePerm {
 		t.Errorf("Mode() = %v, want %v", info.Mode(), fs.ModePerm)
 	}
+}
+
+func mustNullFS(tb testing.TB) *nullFS {
+	return makeNullFS(nullFSPrefix)
 }

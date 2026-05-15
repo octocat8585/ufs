@@ -16,12 +16,83 @@ package ufs
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 )
+
+func TestRsync(t *testing.T) {
+	srcFS, err := newLocalFS(testLocalFSName)
+	if err != nil {
+		t.Fatalf("cannot mount localFS(%q), %s", testLocalFSName, err)
+	}
+	for _, fsysTC := range getReadWriteTestCaseList() {
+		t.Run(fsysTC.name, func(t *testing.T) {
+			t.Parallel()
+			fsys := fsysTC.createFS(t)
+			if err := Rsync(srcFS, fsys, "."); err != nil {
+				t.Errorf("rsync failed with error, %s", err)
+			}
+
+			err := ForEachFilename(srcFS, ".", func(name string) error {
+				srcData, err := fs.ReadFile(srcFS, name)
+				if err != nil {
+					return fmt.Errorf("cannot read srcFS(%q), %w", name, err)
+				}
+				gotData, err := fs.ReadFile(fsys, name)
+				if err != nil {
+					return fmt.Errorf("cannot read destFS(%q), %w", name, err)
+				}
+				wantString := string(srcData)
+				gotString := string(gotData)
+				if diff := cmp.Diff(wantString, gotString); diff != "" {
+					return fmt.Errorf("%q mismatch got %s, want %s diff(-want,+got):\n %v", name, gotString, wantString, diff)
+				}
+				return nil
+			})
+			if err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+func TestRsyncAngry(t *testing.T) {
+	srcFS, err := newLocalFS(testLocalFSName)
+	if err != nil {
+		t.Fatalf("cannot mount localFS(%q), %s", testLocalFSName, err)
+	}
+
+	destFS := makeAngryFS(angryFSPrefix)
+
+	if err := Rsync(srcFS, destFS, "."); err == nil {
+		t.Error("rsync expected to fail got nil error")
+	}
+}
+
+func TestRsyncNull(t *testing.T) {
+	srcFS, err := newLocalFS(testLocalFSName)
+	if err != nil {
+		t.Fatalf("cannot mount localFS(%q), %s", testLocalFSName, err)
+	}
+
+	destFS := mustNullFS(t)
+
+	if err := Rsync(srcFS, destFS, "."); err != nil {
+		t.Errorf("rsync expected to succeed, failed with error: %s", err)
+	}
+
+	entries, err := destFS.ReadDir(".")
+	if err != nil {
+		t.Error(err)
+	}
+	if len(entries) > 0 {
+		t.Errorf("nullFS should have 0 entries, got: %v", entries)
+	}
+}
 
 // setupListFS creates a memFS with: a.txt, dir/b.txt, dir/c.txt.
 func setupListFS(t *testing.T) FS {

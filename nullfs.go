@@ -114,6 +114,11 @@ func (vrd *nullReadDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 }
 
 type nullFS struct {
+	name string
+}
+
+func (fsys *nullFS) String() string {
+	return fsys.name
 }
 
 func (fsys *nullFS) Open(name string) (fs.File, error) {
@@ -190,11 +195,13 @@ func (fsys *nullFS) Glob(pattern string) ([]string, error) {
 }
 
 func newNullFS(name string) (FS, error) {
-	return makeNullFS(), nil
+	return makeNullFS(name), nil
 }
 
-func makeNullFS() *nullFS {
-	return &nullFS{}
+func makeNullFS(name string) *nullFS {
+	return &nullFS{
+		name: name,
+	}
 }
 
 func isNullFSUri(name string) bool {
