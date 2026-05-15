@@ -24,22 +24,10 @@ func TestIsAngryFSUri(t *testing.T) {
 		name string
 		want bool
 	}{
-		{
-			name: "angry:",
-			want: true,
-		},
-		{
-			name: "angry://",
-			want: true,
-		},
-		{
-			name: "angryfs://",
-			want: false,
-		},
-		{
-			name: "mem://",
-			want: false,
-		},
+		{name: "angry:", want: true},
+		{name: "angry://", want: true},
+		{name: "angryfs://", want: false},
+		{name: "mem://", want: false},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -52,123 +40,115 @@ func TestIsAngryFSUri(t *testing.T) {
 }
 
 func TestNewAngryFS(t *testing.T) {
-	fsys, err := newAngryFS("angry://")
-	if err != nil {
-		t.Fatal("newAngryFS() =", err)
-	}
+	fsys := mustAngryFS(t)
 	if fsys == nil {
 		t.Fatal("fsys is nil")
 	}
 }
 
 func TestAngryFSOpen(t *testing.T) {
-	fsys, err := newAngryFS("angry://")
-	if err != nil {
-		t.Fatal("newAngryFS() =", err)
-	}
-
-	// Test valid path - expects ErrInvalid as per current implementation
-	_, err = fsys.Open("valid.txt")
-	if err != fs.ErrInvalid {
-		t.Errorf("Open(\"valid.txt\") = %v, want %v", err, fs.ErrInvalid)
-	}
-
-	// Test invalid paths
-	invalidPaths := []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-
-	for _, path := range invalidPaths {
-		_, err := fsys.Open(path)
-		if err == nil {
-			t.Errorf("Open(%q) succeeded, want error", path)
-		} else if _, ok := err.(*fs.PathError); !ok {
-			t.Errorf("Open(%q) returned %T, want *fs.PathError", path, err)
-		}
+	for _, tc := range testassetFilenameList {
+		t.Run(tc, func(t *testing.T) {
+			fsys := mustAngryFS(t)
+			_, err := fsys.Open(tc)
+			if err != fs.ErrInvalid {
+				t.Errorf("Open(%q) = %v, want %v", tc, err, fs.ErrInvalid)
+			}
+		})
 	}
 }
 
 func TestAngryFSClose(t *testing.T) {
-	fsys, err := newAngryFS("angry://")
-	if err != nil {
-		t.Fatal(err)
-	}
+	fsys := mustAngryFS(t)
 	if err := fsys.Close(); err != fs.ErrInvalid {
 		t.Errorf("Close() = %v, want %v", err, fs.ErrInvalid)
 	}
 }
 
 func TestAngryFSMkdirAll(t *testing.T) {
-	fsys, err := newAngryFS("angry://")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := fsys.MkdirAll("dir", fs.ModePerm); err != fs.ErrInvalid {
-		t.Errorf("MkdirAll() = %v, want %v", err, fs.ErrInvalid)
+	for _, tc := range []string{"a", "a/b", "a/b/c", "abc", "null"} {
+		t.Run(tc, func(t *testing.T) {
+			fsys := mustAngryFS(t)
+			if err := fsys.MkdirAll(tc, fs.ModePerm); err != fs.ErrInvalid {
+				t.Errorf("MkdirAll(%q) = %v, want %v", tc, err, fs.ErrInvalid)
+			}
+		})
 	}
 }
 
 func TestAngryFSReadFile(t *testing.T) {
-	afs := makeAngryFS()
-	if _, err := afs.ReadFile("foo.txt"); err != fs.ErrInvalid {
-		t.Errorf("ReadFile() = %v, want %v", err, fs.ErrInvalid)
+	for _, tc := range testassetFilenameList {
+		t.Run(tc, func(t *testing.T) {
+			fsys := mustAngryFS(t)
+			if _, err := fsys.ReadFile(tc); err != fs.ErrInvalid {
+				t.Errorf("ReadFile(%q) = %v, want %v", tc, err, fs.ErrInvalid)
+			}
+		})
 	}
 }
 
 func TestAngryFSReadLink(t *testing.T) {
-	afs := makeAngryFS()
-	if _, err := afs.ReadLink("foo.txt"); err != fs.ErrInvalid {
-		t.Errorf("ReadLink() = %v, want %v", err, fs.ErrInvalid)
+	for _, tc := range testassetFilenameList {
+		t.Run(tc, func(t *testing.T) {
+			fsys := mustAngryFS(t)
+			if _, err := fsys.ReadLink(tc); err != fs.ErrInvalid {
+				t.Errorf("ReadLink(%q) = %v, want %v", tc, err, fs.ErrInvalid)
+			}
+		})
 	}
 }
 
 func TestAngryFSLstat(t *testing.T) {
-	afs := makeAngryFS()
-	if _, err := afs.Lstat("foo.txt"); err != fs.ErrInvalid {
-		t.Errorf("Lstat() = %v, want %v", err, fs.ErrInvalid)
+	for _, tc := range testassetFilenameList {
+		t.Run(tc, func(t *testing.T) {
+			fsys := mustAngryFS(t)
+			if _, err := fsys.Lstat(tc); err != fs.ErrInvalid {
+				t.Errorf("Lstat(%q) = %v, want %v", tc, err, fs.ErrInvalid)
+			}
+		})
 	}
 }
 
 func TestAngryFSReadDir(t *testing.T) {
-	afs := makeAngryFS()
-	if _, err := afs.ReadDir("dir"); err != fs.ErrInvalid {
-		t.Errorf("ReadDir() = %v, want %v", err, fs.ErrInvalid)
+	for tcDirName := range testassetDirList {
+		t.Run(tcDirName, func(t *testing.T) {
+			fsys := mustAngryFS(t)
+			if _, err := fsys.ReadDir(tcDirName); err != fs.ErrInvalid {
+				t.Errorf("ReadDir(%q) = %v, want %v", tcDirName, err, fs.ErrInvalid)
+			}
+		})
 	}
 }
 
 func TestAngryFSGlob(t *testing.T) {
-	afs := makeAngryFS()
-	if _, err := afs.Glob("*.txt"); err != fs.ErrInvalid {
+	fsys := mustAngryFS(t)
+	if _, err := fsys.Glob("*.txt"); err != fs.ErrInvalid {
 		t.Errorf("Glob() = %v, want %v", err, fs.ErrInvalid)
 	}
 }
 
 func TestAngryFSCreate(t *testing.T) {
-	fsys, err := newAngryFS("angry://")
+	for _, tc := range testassetCreateFileList {
+		t.Run(tc, func(t *testing.T) {
+			fsys := mustAngryFS(t)
+			if _, err := fsys.Create(tc); err != fs.ErrInvalid {
+				t.Errorf("Create(%q) = %v, want %v", tc, err, fs.ErrInvalid)
+			}
+		})
+	}
+}
+
+func TestAngryFSString(t *testing.T) {
+	fsys := mustAngryFS(t)
+	if got := fsys.String(); got != angryFSPrefix {
+		t.Errorf("String() got: %q, want %q", got, angryFSPrefix)
+	}
+}
+
+func mustAngryFS(tb testing.TB) *angryFS {
+	fsys, err := newAngryFS(angryFSPrefix)
 	if err != nil {
-		t.Fatal("newAngryFS() =", err)
+		tb.Fatalf("newAngryFS() returned error, %s", err)
 	}
-
-	// Test valid path - expects ErrInvalid
-	_, err = fsys.Create("valid.txt")
-	if err != fs.ErrInvalid {
-		t.Errorf("Create(\"valid.txt\") = %v, want %v", err, fs.ErrInvalid)
-	}
-
-	// Test invalid paths - checking for PathError even though implementation might fail early
-	// But `angryFS` implementation checks ValidPath first, so it should be PathError.
-	invalidPaths := []string{
-		"/absolute/path",
-		"../relative/path",
-		"invalid/../path",
-	}
-
-	for _, path := range invalidPaths {
-		_, err := fsys.Create(path)
-		if err == nil {
-			t.Errorf("Create(%q) succeeded, want error", path)
-		}
-	}
+	return fsys
 }

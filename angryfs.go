@@ -25,6 +25,7 @@ const (
 
 var (
 	_ FS            = (*angryFS)(nil)
+	_ stringer      = (*angryFS)(nil)
 	_ fs.ReadFileFS = (*angryFS)(nil)
 	_ fs.ReadDirFS  = (*angryFS)(nil)
 	_ fs.ReadLinkFS = (*angryFS)(nil)
@@ -34,6 +35,11 @@ var (
 )
 
 type angryFS struct {
+	name string
+}
+
+func (fsys *angryFS) String() string {
+	return fsys.name
 }
 
 func (fsys *angryFS) Open(name string) (fs.File, error) {
@@ -56,22 +62,37 @@ func (fsys *angryFS) Create(name string) (File, error) {
 }
 
 func (fsys *angryFS) MkdirAll(name string, perm fs.FileMode) error {
+	if err := validPath("mkdir", name); err != nil {
+		return err
+	}
 	return errAngry
 }
 
 func (fsys *angryFS) ReadFile(name string) ([]byte, error) {
+	if err := validPath("readfile", name); err != nil {
+		return nil, err
+	}
 	return nil, errAngry
 }
 
 func (fsys *angryFS) ReadLink(name string) (string, error) {
+	if err := validPath("readlink", name); err != nil {
+		return "", err
+	}
 	return "", errAngry
 }
 
 func (fsys *angryFS) Lstat(name string) (fs.FileInfo, error) {
+	if err := validPath("lstat", name); err != nil {
+		return nil, err
+	}
 	return nil, errAngry
 }
 
 func (fsys *angryFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if err := validPath("readdir", name); err != nil {
+		return nil, err
+	}
 	return nil, errAngry
 }
 
@@ -79,12 +100,14 @@ func (fsys *angryFS) Glob(pattern string) ([]string, error) {
 	return nil, errAngry
 }
 
-func newAngryFS(name string) (FS, error) {
-	return makeAngryFS(), nil
+func newAngryFS(name string) (*angryFS, error) {
+	return makeAngryFS(name), nil
 }
 
-func makeAngryFS() *angryFS {
-	return &angryFS{}
+func makeAngryFS(name string) *angryFS {
+	return &angryFS{
+		name: name,
+	}
 }
 
 func isAngryFSUri(name string) bool {

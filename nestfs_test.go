@@ -43,7 +43,7 @@ func TestNewNestFSInvalid(t *testing.T) {
 func TestMountMap(t *testing.T) {
 	mm := makeMountMap()
 	mfs := makeMemFS("memory:///")
-	afs := makeAngryFS()
+	afs := makeAngryFS(angryFSPrefix)
 	nfs := makeNullFS()
 
 	must(t, mm.put("mounts/null", makeNestFS(nfs)))

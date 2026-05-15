@@ -475,4 +475,3 @@ func parseGCSPath(path string, op string) (string, string, error) {
 func isGCSFSUri(name string) bool {
 	return strings.HasPrefix(name, gcsFSPrefix)
 }
-
