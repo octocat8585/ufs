@@ -112,6 +112,10 @@ var (
 	testassetCreateFileList = []string{"a.txt", "b.txt", "a/b.txt"}
 )
 
+func getReadWriteTestCaseList() []fsTestCase {
+	return readWriteFSTestCaseList
+}
+
 func getAllTestCaseList() []fsTestCase {
 	return append(append(readOnlyFSTestCaseList, readWriteFSTestCaseList...), angryFSTestCase)
 }
