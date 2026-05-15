@@ -213,6 +213,26 @@ func TestNestFSFull(t *testing.T) {
 	assertContains(t, fsys, "testing/testassets/files/index.html", "testing/testassets/files/index.html")
 	assertContains(t, fsys, "testing/testassets/archives/nested-testassets.zip.d/site.js", "testing/testassets/files/site.js")
 	assertContains(t, fsys, "testing/testassets/archives/nested-testassets.zip.d/single-testassets.zip.d/index.html", "testing/testassets/files/index.html")
+	assertDir(t, fsys, "testing/testassets/archives", []string{
+		"nested-testassets.zip",
+		"nested-testassets.zip.d",
+		"nodir-testassets.zip",
+		"nodir-testassets.zip.d",
+		"single-testassets.zip",
+		"single-testassets.zip.d",
+		"testassets.7z",
+		"testassets.7z.d",
+		"testassets.tar",
+		"testassets.tar.bz2",
+		"testassets.tar.bz2.d",
+		"testassets.tar.d",
+		"testassets.tar.gz",
+		"testassets.tar.gz.d",
+		"testassets.tar.lz4",
+		"testassets.tar.lz4.d",
+		"testassets.tar.xz",
+		"testassets.tar.xz.d",
+	})
 }
 
 func TestNestedFS(t *testing.T) {

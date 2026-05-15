@@ -20,6 +20,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -380,5 +381,36 @@ func assertContains(t *testing.T, fsys FS, name string, substr string) {
 	}
 	if !strings.Contains(string(data), substr) {
 		t.Errorf("%q does not contain %q, (len: %d) %q", name, substr, len(data), string(data))
+	}
+}
+
+func assertDir(t *testing.T, fsys FS, name string, want []string) {
+	t.Helper()
+
+	if gotEntries, err := fsys.ReadDir(name); err != nil {
+		t.Errorf("cannot ReadDir(%q), %s", name, err)
+	} else {
+		gotEntryNames := dirEntryListToNames(gotEntries)
+		if d := cmp.Diff(want, gotEntryNames); d != "" {
+			t.Errorf("fs.ReadDir(%q) mismatch, got %s, want %s diff(-want,+got):\n %v", name, gotEntryNames, want, d)
+		}
+	}
+
+	if f, err := fsys.Open(name); err != nil {
+		t.Errorf("cannot open %q, %s", name, err)
+	} else {
+		rdf, ok := f.(fs.ReadDirFile)
+		if ok {
+			if gotEntries, err := rdf.ReadDir(-1); err != nil {
+				t.Errorf("cannot ReadDir(%q), %s", name, err)
+			} else {
+				gotEntryNames := dirEntryListToNames(gotEntries)
+				if d := cmp.Diff(want, gotEntryNames); d != "" {
+					t.Errorf("ReadDir(-1) mismatch, got %s, want %s diff(-want,+got):\n %v", gotEntryNames, want, d)
+				}
+			}
+		} else {
+			t.Errorf("%q does not open a ReadDirFile, %s", name, reflect.TypeOf(f).Name())
+		}
 	}
 }
