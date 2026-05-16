@@ -17,11 +17,16 @@ package ufs
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestInvalidPath(t *testing.T) {
@@ -138,7 +143,7 @@ func TestFSConventions(t *testing.T) {
 }
 
 func TestFSClose(t *testing.T) {
-	// TODO: Change to getAllTestCaseList
+	// TODO: Change to getAllRegularTestCaseList
 	for _, fsysTC := range getReadWriteTestCaseList() {
 		t.Run(fsysTC.name, func(t *testing.T) {
 			t.Parallel()
@@ -201,6 +206,173 @@ func TestFSString(t *testing.T) {
 			fsys := tc.createFS(t)
 			if got := fsys.String(); !strings.Contains(got, tc.wantString) {
 				t.Errorf("%s.String() should contain %q: got: %q", fsys, tc.wantString, got)
+			}
+		})
+	}
+}
+
+func TestFSReadDir(t *testing.T) {
+	// TODO: Change to getAllRegularTestCaseList
+	for _, fsysTC := range getReadWriteTestCaseList() {
+		t.Run(fsysTC.name, func(t *testing.T) {
+			t.Parallel()
+			fsys := fsysTC.createFS(t)
+
+			dirs := []string{"a", "b", "b/a/c", "b/b", "b/c", "c", "d/e/f/g", "d/e/g", "a/b/c/d/e/f/g"}
+			lsMap := map[string][]string{
+				".":             {"a", "b", "c", "d"},
+				"a":             {"b"},
+				"b":             {"a", "b", "c"},
+				"b/a":           {"c"},
+				"b/a/c":         {},
+				"b/b":           {},
+				"b/c":           {},
+				"c":             {},
+				"d":             {"e"},
+				"d/e":           {"f", "g"},
+				"d/e/f":         {"g"},
+				"d/e/f/g":       {},
+				"d/e/g":         {},
+				"a/b":           {"c"},
+				"a/b/c":         {"d"},
+				"a/b/c/d":       {"e"},
+				"a/b/c/d/e":     {"f"},
+				"a/b/c/d/e/f":   {"g"},
+				"a/b/c/d/e/f/g": {},
+			}
+
+			for _, dir := range dirs {
+				t.Run(fmt.Sprintf("MkdirAll/%s", dir), func(t *testing.T) {
+					if err := fsys.MkdirAll(dir, fs.ModePerm); err != nil {
+						t.Errorf("cannot Mkdir(%q), %s", dir, err)
+					}
+				})
+			}
+
+			for input, want := range lsMap {
+				t.Run(fmt.Sprintf("ReadDir/%s", input), func(t *testing.T) {
+					gotEntries, err := fsys.ReadDir(input)
+					if err != nil {
+						t.Errorf("cannot ReadDir(%q), got error: %s", input, err)
+					}
+					gotNames := dirEntryListToNames(gotEntries)
+					if diff := cmp.Diff(want, gotNames); diff != "" {
+						t.Errorf("got %s, want %s diff(-want,+got):\n %v", gotNames, want, diff)
+					}
+				})
+
+				t.Run(fmt.Sprintf("Open/%s", input), func(t *testing.T) {
+					f, err := fsys.Open(input)
+					if err != nil {
+						t.Errorf("cannot ReadDir(%q), got error: %s", input, err)
+					}
+					if rdf, ok := f.(fs.ReadDirFile); ok {
+						entries, err := rdf.ReadDir(-1)
+						if err != nil {
+							t.Errorf("ReadDir(-1) failed with error, %s", err)
+						}
+						gotNames := dirEntryListToNames(entries)
+						sort.Strings(gotNames)
+						sort.Strings(want)
+						if diff := cmp.Diff(want, gotNames); diff != "" {
+							t.Errorf("ReadDir(-1) got %s, want %s diff(-want,+got):\n %v", gotNames, want, diff)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestFSCreate(t *testing.T) {
+	// TODO: Change to getAllRegularTestCaseList
+	for _, fsysTC := range getReadWriteTestCaseList() {
+		t.Run(fsysTC.name, func(t *testing.T) {
+			t.Parallel()
+			fsys := fsysTC.createFS(t)
+
+			filenames := []string{"b/a/c", "b/b", "b/c", "c", "d/e/f/g", "d/e/g", "a/b/c/d/e/f/g"}
+
+			for _, filename := range filenames {
+				t.Run(fmt.Sprintf("Create/%s", filename), func(t *testing.T) {
+					dir, _ := filepath.Split(filename)
+					dir = strings.Trim(dir, pathSeparator)
+					if dir == "" {
+						dir = "."
+					}
+					if err := fsys.MkdirAll(dir, fs.ModePerm); err != nil {
+						t.Errorf("cannot Mkdir(%q), %s", dir, err)
+					}
+
+					t.Run("Create", func(t *testing.T) {
+						f, err := fsys.Create(filename)
+						if err != nil {
+							t.Errorf("Open(%q) failed, %s", filename, err)
+						}
+						bytesWritten, err := f.WriteString(filename)
+						if err != nil {
+							t.Errorf("WriteString(%q) failed to write, %s", filename, err)
+						}
+						if bytesWritten != len(filename) {
+							t.Errorf("WriteString(%q) bytesWritten mismatch, want: %d, got: %d", filename, len(filename), bytesWritten)
+						}
+						if err := f.Close(); err != nil {
+							t.Errorf("Close() got error, %s", err)
+						}
+					})
+
+					t.Run("ReadFile", func(t *testing.T) {
+						data, err := fsys.ReadFile(filename)
+						if err != nil {
+							t.Errorf("ReadFile(%q) got error, %s", filename, err)
+						}
+						gotData := string(data)
+						if gotData != filename {
+							t.Errorf("ReadFile(%q) mismatch, got: %q, want: %q", filename, gotData, filename)
+						}
+					})
+
+					t.Run("Open", func(t *testing.T) {
+						rf, err := fsys.Open(filename)
+						if err != nil {
+							t.Errorf("Open(%q) got error, %s", filename, err)
+						}
+						data, err := io.ReadAll(rf)
+						if err != nil {
+							t.Errorf("io.ReadAll(%q) got error, %s", filename, err)
+						}
+						if err := rf.Close(); err != nil {
+							t.Errorf("Close() got error, %s", err)
+						}
+						gotData := string(data)
+						if gotData != filename {
+							t.Errorf("io.ReadAll(%q) mismatch, got: %q, want: %q", filename, gotData, filename)
+						}
+					})
+
+					t.Run("ReadLink", func(t *testing.T) {
+						lfilename, err := fsys.ReadLink(filename)
+						// TODO: Should this be an error or not? It seems li
+						if err == nil {
+							t.Errorf("ReadLink(%q) error was nil", filename)
+						} else if _, ok := err.(*fs.PathError); !ok {
+							t.Errorf("ReadLink(%q) error was not of type *fs.PathError, %s", filename, err)
+						}
+						if lfilename != "" {
+							t.Errorf("ReadLink(%q) mismatch, got: %q, want: ''", filename, lfilename)
+						}
+					})
+
+					t.Run("Lstat", func(t *testing.T) {
+						stat, err := fsys.Lstat(filename)
+						if err != nil {
+							t.Errorf("Lstat(%q) got error, %s", filename, err)
+						}
+						if stat == nil {
+							t.Errorf("Lstat(%q) returned nil FileInfo", filename)
+						}
+					})
+				})
 			}
 		})
 	}
