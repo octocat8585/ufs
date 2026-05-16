@@ -25,7 +25,6 @@ const (
 
 var (
 	_ FS            = (*angryFS)(nil)
-	_ stringer      = (*angryFS)(nil)
 	_ fs.ReadFileFS = (*angryFS)(nil)
 	_ fs.ReadDirFS  = (*angryFS)(nil)
 	_ fs.ReadLinkFS = (*angryFS)(nil)

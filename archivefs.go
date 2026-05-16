@@ -34,7 +34,6 @@ var (
 	_ FS            = (*archiveFS)(nil)
 	_ fs.ReadFileFS = (*archiveFS)(nil)
 	_ fs.ReadDirFS  = (*archiveFS)(nil)
-	_ fullFS        = (*archiveFS)(nil)
 
 	archiveExtList = []string{".tar", ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz4", ".tar.br", ".tar.zst", ".rar", ".zip", ".7z"}
 )
@@ -51,6 +50,11 @@ func isMountableArchivePath(name string) bool {
 
 type archiveFS struct {
 	fsys fs.FS
+	name string
+}
+
+func (fsys *archiveFS) String() string {
+	return fsys.name
 }
 
 func (fsys *archiveFS) Open(name string) (fs.File, error) {
@@ -106,7 +110,7 @@ func newArchiveFSFromLocalFS(ctx context.Context, name string) (*archiveFS, erro
 	if err != nil {
 		return nil, fmt.Errorf("cannot mount %q as archiveFS, %w", name, err)
 	}
-	return makeArchiveFS(fsys), nil
+	return makeArchiveFS(fsys, name), nil
 }
 
 func coerceToReaderAt(file fs.File) (io.ReaderAt, error) {
@@ -146,15 +150,16 @@ func newArchiveFSFromFile(file fs.File) (*archiveFS, error) {
 				Stream: r,
 				Format: af,
 			}
-			return makeArchiveFS(afs), nil
+			return makeArchiveFS(afs, stat.Name()), nil
 		}
 	}
 	return nil, fmt.Errorf("archive not recognized")
 }
 
-func makeArchiveFS(fsys fs.FS) *archiveFS {
+func makeArchiveFS(fsys fs.FS, name string) *archiveFS {
 	return &archiveFS{
 		fsys: fsys,
+		name: name,
 	}
 }
 
@@ -177,7 +182,7 @@ func newTempMountRemoteArchiveFS(name string) (FS, error) {
 		cleanup()
 		return nil, err
 	}
-	return makeTempMountFS(fsys, cleanup), nil
+	return makeTempMountFS(fsys, tempDir, cleanup), nil
 }
 
 func isArchiveUri(name string) bool {

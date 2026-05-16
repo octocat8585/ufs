@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/fs"
 	"reflect"
+	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -137,6 +138,7 @@ func TestFSConventions(t *testing.T) {
 }
 
 func TestFSClose(t *testing.T) {
+	// TODO: Change to getAllTestCaseList
 	for _, fsysTC := range getReadWriteTestCaseList() {
 		t.Run(fsysTC.name, func(t *testing.T) {
 			t.Parallel()
@@ -188,7 +190,18 @@ func TestFSClose(t *testing.T) {
 					t.Errorf("ReadDir('.') did not return fs.ErrClosed, got: %s", err)
 				}
 			})
+		})
+	}
+}
 
+func TestFSString(t *testing.T) {
+	for _, tc := range getAllTestCaseList() {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fsys := tc.createFS(t)
+			if got := fsys.String(); !strings.Contains(got, tc.wantString) {
+				t.Errorf("%s.String() should contain %q: got: %q", fsys, tc.wantString, got)
+			}
 		})
 	}
 }
