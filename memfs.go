@@ -238,7 +238,21 @@ func (f *memFile) ReadDir(n int) ([]fs.DirEntry, error) {
 	return entries, nil
 }
 
+func (fsys *memFS) isClosed() bool {
+	fsys.mu.RLock()
+	closed := fsys.dir == nil
+	fsys.mu.RUnlock()
+	return closed
+}
+
 func (fsys *memFS) Open(name string) (fs.File, error) {
+	return fsys.open(name, "open")
+}
+
+func (fsys *memFS) open(name string, op string) (fs.File, error) {
+	if fsys.isClosed() {
+		return nil, fs.ErrClosed
+	}
 	// Handle root directory
 	if name == cwdPath {
 		return &memFile{
@@ -249,7 +263,7 @@ func (fsys *memFS) Open(name string) (fs.File, error) {
 			fsys:    fsys,
 		}, nil
 	}
-	if err := validPath("open", name); err != nil {
+	if err := validPath(op, name); err != nil {
 		return nil, err
 	}
 	fsys.mu.RLock()
@@ -270,10 +284,16 @@ func (fsys *memFS) Open(name string) (fs.File, error) {
 }
 
 func (fsys *memFS) Close() error {
+	fsys.mu.Lock()
+	fsys.dir = nil
+	fsys.mu.Unlock()
 	return nil
 }
 
 func (fsys *memFS) Create(name string) (File, error) {
+	if fsys.isClosed() {
+		return nil, fs.ErrClosed
+	}
 	if err := validPath("create", name); err != nil {
 		return nil, err
 	}
@@ -302,6 +322,9 @@ func (fsys *memFS) Create(name string) (File, error) {
 }
 
 func (fsys *memFS) MkdirAll(name string, perm fs.FileMode) error {
+	if fsys.isClosed() {
+		return fs.ErrClosed
+	}
 	if err := validPath("mkdir", name); err != nil {
 		return err
 	}
@@ -418,10 +441,7 @@ func (fsys *memFS) Lstat(name string) (fs.FileInfo, error) {
 }
 
 func (fsys *memFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	if err := validPath("readdir", name); err != nil {
-		return nil, err
-	}
-	f, err := fsys.Open(name)
+	f, err := fsys.open(name, "readdir")
 	if err != nil {
 		return nil, err
 	}

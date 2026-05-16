@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"reflect"
@@ -131,6 +132,63 @@ func TestFSConventions(t *testing.T) {
 			if err := fstest.TestFS(fsys, allFilenames...); err != nil {
 				t.Error(err)
 			}
+		})
+	}
+}
+
+func TestFSClose(t *testing.T) {
+	for _, fsysTC := range getReadWriteTestCaseList() {
+		t.Run(fsysTC.name, func(t *testing.T) {
+			t.Parallel()
+			fsys := fsysTC.createFS(t)
+			for i := range 10 {
+				if err := fsys.Close(); err != nil {
+					t.Errorf("Close() [%d] failed with error, %s", i, err)
+				}
+			}
+
+			t.Run("Open", func(t *testing.T) {
+				f, err := fsys.Open(".")
+				if f != nil {
+					buf := make([]byte, 64)
+					if bytesWritten, err := f.Read(buf); bytesWritten != 0 && err != fs.ErrClosed {
+						t.Errorf("Open('.') worked for a closed file system, read %d (want: 0) bytes with error= %s (want: fs.ErrClosed), file: %+v", bytesWritten, err, f)
+					}
+				}
+				if !errors.Is(err, fs.ErrClosed) {
+					t.Errorf("Open('.') did not return fs.ErrClosed, got: %s", err)
+				}
+			})
+
+			t.Run("Create", func(t *testing.T) {
+				f, err := fsys.Create("file.txt")
+				if f != nil {
+					buf := make([]byte, 64)
+					if bytesWritten, err := f.Write(buf); bytesWritten != 0 && err != fs.ErrClosed {
+						t.Errorf("Create('file.txt') worked for a closed file system, read %d (want: 0) bytes with error= %s (want: fs.ErrClosed), file: %+v", bytesWritten, err, f)
+					}
+				}
+				if !errors.Is(err, fs.ErrClosed) {
+					t.Errorf("Create('file.txt') did not return fs.ErrClosed, got: %s", err)
+				}
+			})
+
+			t.Run("MkdirAll", func(t *testing.T) {
+				if err := fsys.MkdirAll("a/b/c", fs.ModePerm); !errors.Is(err, fs.ErrClosed) {
+					t.Errorf("MkdirAll('a/b/c') did not return fs.ErrClosed, got: %s", err)
+				}
+			})
+
+			t.Run("ReadDir", func(t *testing.T) {
+				entries, err := fs.ReadDir(fsys, ".")
+				if len(entries) != 0 {
+					t.Errorf("ReadDir('.') returned results for a closed file system, got: %v", entries)
+				}
+				if !errors.Is(err, fs.ErrClosed) {
+					t.Errorf("ReadDir('.') did not return fs.ErrClosed, got: %s", err)
+				}
+			})
+
 		})
 	}
 }

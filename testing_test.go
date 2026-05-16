@@ -117,7 +117,20 @@ func getReadWriteTestCaseList() []fsTestCase {
 }
 
 func getAllTestCaseList() []fsTestCase {
-	return append(append(readOnlyFSTestCaseList, readWriteFSTestCaseList...), angryFSTestCase)
+	return appendNestFSTestCase(append(append(readOnlyFSTestCaseList, readWriteFSTestCaseList...), angryFSTestCase))
+}
+
+func appendNestFSTestCase(tcl []fsTestCase) []fsTestCase {
+	result := []fsTestCase{}
+	for _, tc := range tcl {
+		result = append(result, tc, fsTestCase{
+			name: "nestFS." + tc.name,
+			createFS: func(tb testing.TB) FS {
+				return makeNestFS(tc.createFS(tb))
+			},
+		})
+	}
+	return result
 }
 
 func testFileSystem(t *testing.T, newFSFunc func(name string) (FS, error), name string) {
@@ -239,19 +252,6 @@ func mustTime(s string) time.Time {
 		panic(err)
 	}
 	return val
-}
-
-func TestFSClose(t *testing.T) {
-	t.Parallel()
-	for _, tc := range append(readWriteFSTestCaseList, readOnlyFSTestCaseList...) {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			fsys := tc.createFS(t)
-			if err := fsys.Close(); err != nil {
-				t.Errorf("Close() = %v, want nil", err)
-			}
-		})
-	}
 }
 
 func TestFSMkdirAll(t *testing.T) {
