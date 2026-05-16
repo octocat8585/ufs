@@ -41,7 +41,7 @@ func TestNewNestFSInvalid(t *testing.T) {
 }
 
 func TestMountMap(t *testing.T) {
-	mm := makeMountMap()
+	mm := makeMountMap("test")
 	mfs := makeMemFS("memory:///")
 	afs := makeAngryFS(angryFSPrefix)
 	nfs := mustNullFS(t)
@@ -190,7 +190,7 @@ func TestMountMap(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("getMount/%s", tc.input), func(t *testing.T) {
-			gotMountPath, gotSubPath, gotFS, ok := mm.getMount(tc.input)
+			gotMountPath, gotSubPath, gotFS, ok := mm.getMountX(tc.input)
 			wantOk := tc.wantMountPath != ""
 			if ok != wantOk {
 				t.Errorf("getMount(%q) ok got: %t, want: %t, fsys: %v", tc.input, ok, wantOk, gotFS)
