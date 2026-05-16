@@ -29,7 +29,7 @@ func TestRsync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot mount localFS(%q), %s", testLocalFSName, err)
 	}
-	for _, fsysTC := range getReadWriteTestCaseList() {
+	for _, fsysTC := range getAllRegularTestCaseList() {
 		t.Run(fsysTC.name, func(t *testing.T) {
 			t.Parallel()
 			fsys := fsysTC.createFS(t)

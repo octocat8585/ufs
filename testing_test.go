@@ -126,6 +126,10 @@ func getAllTestCaseList() []fsTestCase {
 	return appendNestFSTestCase(append(append(readOnlyFSTestCaseList, readWriteFSTestCaseList...), angryFSTestCase))
 }
 
+func getAllRegularTestCaseList() []fsTestCase {
+	return appendNestFSTestCase(readWriteFSTestCaseList)
+}
+
 func getAllExceptAngryTestCaseList() []fsTestCase {
 	return appendNestFSTestCase(append(readOnlyFSTestCaseList, readWriteFSTestCaseList...))
 }
