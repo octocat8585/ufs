@@ -47,16 +47,17 @@ func getPotentialArchives(name string) []string {
 }
 
 type mountMap struct {
-	m map[string]*nestFS
+	m        map[string]*nestFS
+	baseName string
 }
 
 func (m *mountMap) put(name string, fsys *nestFS) error {
 	for mountPoint := range m.m {
 		if _, ok := removePathPrefix(mountPoint, name); ok {
-			return pathError("mount", name, fmt.Errorf("mount %q conflicts with %q. You must change the order so that mounting is properly nested.", name, mountPoint))
+			return pathError("mount", name, fmt.Errorf("mount %q conflicts with %q. You must change the order so that mounting is properly nested. mounts: %s, %+v", name, mountPoint, m.baseName, m.m))
 		}
 		if subName, ok := removePathPrefix(name, mountPoint); ok {
-			return pathError("mount", name, fmt.Errorf("mount %q is nested within %q. To correct, mount %q as %q within %q", name, mountPoint, name, subName, mountPoint))
+			return pathError("mount", name, fmt.Errorf("mount %q is nested within %q. To correct, mount %q as %q within %q. mounts: %s, %+v", name, mountPoint, name, subName, mountPoint, m.baseName, m.m))
 		}
 	}
 	m.m[filepath.Clean(name)] = fsys
@@ -104,7 +105,16 @@ func (m *mountMap) getMatchesBySubPath(name string) map[string]*nestFS {
 	return matches
 }
 
-func (m *mountMap) getMount(name string) (string, string, *nestFS, bool) {
+func (m *mountMap) getMount(name string) *nestFS {
+	name = filepath.Clean(name)
+	nFS, ok := m.m[name]
+	if !ok {
+		return nil
+	}
+	return nFS
+}
+
+func (m *mountMap) getMountX(name string) (string, string, *nestFS, bool) {
 	name = filepath.Clean(name)
 	if isCwd(name) {
 		return "", "", nil, false
@@ -136,9 +146,10 @@ func (m *mountMap) Close() error {
 	return nil
 }
 
-func makeMountMap() *mountMap {
+func makeMountMap(baseName string) *mountMap {
 	return &mountMap{
-		m: map[string]*nestFS{},
+		m:        map[string]*nestFS{},
+		baseName: baseName,
 	}
 }
 
@@ -194,6 +205,9 @@ func (fsys *nestFS) addMount(name string, mountedFS *nestFS) error {
 }
 
 func (fsys *nestFS) mountArchive(name string) (*nestFS, error) {
+	if maybeFS := fsys.mounts.getMount(name + archiveDirExt); maybeFS != nil {
+		return maybeFS, nil
+	}
 	ctx := context.Background()
 	lfs, ok := fsys.fsys.(*localFS)
 	var newFS *archiveFS
@@ -452,7 +466,7 @@ func newNestFS(name string) (FS, error) {
 func makeNestFS(fsys FS) *nestFS {
 	return &nestFS{
 		fsys:   fsys,
-		mounts: makeMountMap(),
+		mounts: makeMountMap(fsys.String()),
 	}
 }
 
