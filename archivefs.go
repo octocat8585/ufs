@@ -133,12 +133,24 @@ func newArchiveFSFromFile(file fs.File) (*archiveFS, error) {
 		return nil, err
 	}
 
+	ctx := context.Background()
+	name := stat.Name()
+	if readerAtSeeker, ok := file.(archives.ReaderAtSeeker); ok {
+		afs, err := archives.FileSystem(ctx, name, readerAtSeeker)
+		if err != nil {
+			return nil, err
+		}
+		return makeArchiveFS(afs, name), nil
+	}
+
 	readerAt, err := coerceToReaderAt(file)
 	if err != nil {
 		return nil, err
 	}
-	ctx := context.Background()
-	format, _, err := archives.Identify(ctx, stat.Name(), file)
+
+	// TODO: Replace all the logic below with,
+	// archives.FileSystem(ctx, name, archives.ReaderAtSeeker)
+	format, _, err := archives.Identify(ctx, name, file)
 	if err != nil && !errors.Is(err, archives.NoMatch) {
 		return nil, err
 	}
@@ -147,13 +159,14 @@ func newArchiveFSFromFile(file fs.File) (*archiveFS, error) {
 		if af, ok := format.(archives.Archival); ok {
 			r := io.NewSectionReader(readerAt, 0, stat.Size())
 			afs := archives.ArchiveFS{
-				Stream: r,
-				Format: af,
+				Stream:  r,
+				Format:  af,
+				Context: ctx,
 			}
-			return makeArchiveFS(afs, stat.Name()), nil
+			return makeArchiveFS(afs, name), nil
 		}
 	}
-	return nil, fmt.Errorf("archive not recognized")
+	return nil, fmt.Errorf("cannot create archiveFS from file %q, the archive format (%v) is not recognized ", name, format)
 }
 
 func makeArchiveFS(fsys fs.FS, name string) *archiveFS {

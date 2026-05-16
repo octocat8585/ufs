@@ -39,6 +39,7 @@ func downloadFile(dir string, uri string) (string, error) {
 	if err != nil {
 		return archiveFilename, err
 	}
+	defer f.Close()
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		return archiveFilename, err
