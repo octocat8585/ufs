@@ -24,8 +24,13 @@ var (
 )
 
 type tempMountFS struct {
-	lfs    fullFS
+	lfs    FS
+	name   string
 	closer func() error
+}
+
+func (fsys *tempMountFS) String() string {
+	return fsys.name
 }
 
 func (fsys *tempMountFS) Open(name string) (fs.File, error) {
@@ -85,12 +90,13 @@ func newTempMountFS(name string, prepare func(string) error) (FS, error) {
 		return nil, fmt.Errorf("cannot create local fs for temp directory %s, %w", name, err)
 	}
 
-	return makeTempMountFS(lfs.(*localFS), cleanup), nil
+	return makeTempMountFS(lfs.(*localFS), tempDir, cleanup), nil
 }
 
-func makeTempMountFS(lfs fullFS, closer func() error) *tempMountFS {
+func makeTempMountFS(lfs FS, name string, closer func() error) *tempMountFS {
 	return &tempMountFS{
 		lfs:    lfs,
+		name:   name,
 		closer: closer,
 	}
 }

@@ -32,8 +32,9 @@ import (
 )
 
 type fsTestCase struct {
-	name     string
-	createFS func(tb testing.TB) FS
+	name       string
+	createFS   func(tb testing.TB) FS
+	wantString string
 }
 
 var (
@@ -42,6 +43,7 @@ var (
 		createFS: func(tb testing.TB) FS {
 			return makeAngryFS(angryFSPrefix)
 		},
+		wantString: angryFSPrefix,
 	}
 
 	readWriteFSTestCaseList = []fsTestCase{
@@ -58,6 +60,7 @@ var (
 				})
 				return fsys
 			},
+			wantString: os.TempDir(),
 		},
 		{
 			name: "tempMountFS",
@@ -71,6 +74,7 @@ var (
 				})
 				return fsys
 			},
+			wantString: os.TempDir(),
 		},
 		{
 			name: "memFS",
@@ -81,6 +85,7 @@ var (
 				})
 				return fsys
 			},
+			wantString: memFSPrefix,
 		},
 	}
 
@@ -94,6 +99,7 @@ var (
 				})
 				return fsys
 			},
+			wantString: nullFSPrefix,
 		},
 	}
 
@@ -118,6 +124,10 @@ func getReadWriteTestCaseList() []fsTestCase {
 
 func getAllTestCaseList() []fsTestCase {
 	return appendNestFSTestCase(append(append(readOnlyFSTestCaseList, readWriteFSTestCaseList...), angryFSTestCase))
+}
+
+func getAllExceptAngryTestCaseList() []fsTestCase {
+	return appendNestFSTestCase(append(readOnlyFSTestCaseList, readWriteFSTestCaseList...))
 }
 
 func appendNestFSTestCase(tcl []fsTestCase) []fsTestCase {
@@ -256,7 +266,7 @@ func mustTime(s string) time.Time {
 
 func TestFSMkdirAll(t *testing.T) {
 	t.Parallel()
-	for _, tc := range append(readWriteFSTestCaseList, readOnlyFSTestCaseList...) {
+	for _, tc := range getAllExceptAngryTestCaseList() {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fsys := tc.createFS(t)
@@ -270,7 +280,7 @@ func TestFSMkdirAll(t *testing.T) {
 
 func TestFSReadFile(t *testing.T) {
 	t.Parallel()
-	for _, tc := range readWriteFSTestCaseList {
+	for _, tc := range getReadWriteTestCaseList() {
 		t.Run(tc.name, func(t *testing.T) {
 			wantData := randomString(100)
 			t.Parallel()

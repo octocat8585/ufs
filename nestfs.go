@@ -149,6 +149,10 @@ type nestFS struct {
 	mounts *mountMap
 }
 
+func (fsys *nestFS) String() string {
+	return fmt.Sprintf("nestFS(%s)", fsys.fsys.String())
+}
+
 func (fsys *nestFS) appendDirEntry(name string, entries []fs.DirEntry, err error) ([]fs.DirEntry, error) {
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err

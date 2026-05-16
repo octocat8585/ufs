@@ -41,7 +41,7 @@ var (
 
 type memFS struct {
 	mu   sync.RWMutex
-	root string
+	name string
 	dir  memNodeMap
 }
 
@@ -236,6 +236,10 @@ func (f *memFile) ReadDir(n int) ([]fs.DirEntry, error) {
 		entries = append(entries, fs.FileInfoToDirEntry(info))
 	}
 	return entries, nil
+}
+
+func (fsys *memFS) String() string {
+	return fsys.name
 }
 
 func (fsys *memFS) isClosed() bool {
@@ -486,7 +490,7 @@ func newMemFS(name string) (FS, error) {
 
 func makeMemFS(name string) *memFS {
 	return &memFS{
-		root: strings.TrimPrefix(name, "memory://"),
+		name: name,
 		dir:  memNodeMap{},
 	}
 }

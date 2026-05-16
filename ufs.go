@@ -20,21 +20,9 @@ import (
 	"io/fs"
 )
 
-type stringer interface {
-	String() string
-}
-
-type fullFS interface {
-	FSEx
-	FS
-}
-
-// ExFS provides extended functionality from the standard FS.
-type FSEx interface {
-	fs.ReadFileFS
-	fs.ReadDirFS
-	//fs.GlobFS
-	fs.ReadLinkFS
+// FileInfo provides extended information for a file in the file system.
+type FileInfo interface {
+	fs.FileInfo
 }
 
 // ReadFile represents a read-only file.
@@ -55,8 +43,11 @@ type ReadFS interface {
 	fs.FS
 	io.Closer
 	fs.ReadDirFS
+	fs.ReadFileFS
+	fs.ReadLinkFS
 }
 
+// FS represents a read-write file system.
 type FS interface {
 	ReadFS
 
@@ -66,11 +57,10 @@ type FS interface {
 	// MkdirAll creates a directory.
 	// If subdirectories do not exist within the chain they will also be created.
 	MkdirAll(name string, perm fs.FileMode) error
-}
 
-// FileInfo provides extended information for a file in the file system.
-type FileInfo interface {
-	fs.FileInfo
+	// String returns a string representation of the file system.
+	// This is typically the backing path of the file system.
+	String() string
 }
 
 // ListFilenames returns a list of filenames with reduced memory usage.

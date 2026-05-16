@@ -192,6 +192,10 @@ func (f *gcsFile) Readdir(n int) ([]fs.FileInfo, error) {
 	return infos, nil
 }
 
+func (fsys *gcsFS) String() string {
+	return fmt.Sprintf("gs://%s/%s", fsys.bucket, fsys.baseDir)
+}
+
 func (fsys *gcsFS) Open(name string) (fs.File, error) {
 	if name == cwdPath {
 		entries, err := fsys.listDir("")
