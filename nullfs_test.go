@@ -185,7 +185,7 @@ func TestNullFSGlob(t *testing.T) {
 }
 
 func TestNullFileStatDir(t *testing.T) {
-	f := newNullFile("subdir/")
+	f := newNullFile("subdir" + pathSeparator)
 	info, err := f.Stat()
 	if err != nil {
 		t.Fatal(err)

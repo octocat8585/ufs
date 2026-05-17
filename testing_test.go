@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -433,5 +434,11 @@ func assertDir(t *testing.T, fsys FS, name string, want []string) {
 		} else {
 			t.Errorf("%q does not open a ReadDirFile, %s", name, reflect.TypeOf(f).Name())
 		}
+	}
+}
+
+func skipTestOnWindows(tb testing.TB) {
+	if runtime.GOOS == "windows" {
+		tb.Skip("test is not compatible with windows, skipping")
 	}
 }
