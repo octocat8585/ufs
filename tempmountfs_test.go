@@ -77,6 +77,7 @@ func TestTempMountFSPrepareError(t *testing.T) {
 }
 
 func TestTempMountFSReadLink(t *testing.T) {
+	skipTestOnWindows(t)
 	var tempDir string
 	fsys, err := newTempMountFS("test://", func(dir string) error {
 		tempDir = dir
@@ -111,6 +112,7 @@ func TestTempMountFSReadLink(t *testing.T) {
 }
 
 func TestTempMountFSLstat(t *testing.T) {
+	skipTestOnWindows(t)
 	var tempDir string
 	fsys, err := newTempMountFS("test://", func(dir string) error {
 		tempDir = dir
