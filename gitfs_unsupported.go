@@ -25,6 +25,6 @@ func newGitFS(name string) (FS, error) {
 	return nil, fmt.Errorf("cannot mount %q, gitfs is not supported on this operating system", name)
 }
 
-func isSupportedGit(filePath string) bool {
+func isGitFSUri(uri string) bool {
 	return false
 }
