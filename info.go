@@ -86,7 +86,7 @@ func (entry *virtualDirEntry) Info() (fs.FileInfo, error) {
 }
 
 func (entry *virtualDirEntry) Size() int64 {
-	return 0
+	return emptyDirSize
 }
 
 func (entry *virtualDirEntry) ModTime() time.Time {

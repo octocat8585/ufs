@@ -155,7 +155,6 @@ func newArchiveFSFromFile(file fs.File) (*archiveFS, error) {
 		return nil, err
 	}
 	if format != nil {
-		// TODO: we only really need Extractor and Decompressor here, not the combined interfaces...
 		if af, ok := format.(archives.Extractor); ok {
 			r := io.NewSectionReader(readerAt, 0, stat.Size())
 			afs := archives.ArchiveFS{

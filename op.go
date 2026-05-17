@@ -23,6 +23,7 @@ import (
 
 // Rsync copies a directory structure of the source file system to the destination file system.
 func Rsync(srcFS fs.FS, destFS FS, dir string) error {
+	// TODO: Prevent archive traversal.
 	return ForEachFilename(srcFS, dir, func(name string) error {
 		dir, _ := filepath.Split(name)
 		dir = filepath.Clean(dir)
