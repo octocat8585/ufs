@@ -92,6 +92,13 @@ func (fsys *localFS) ReadLink(name string) (string, error) {
 	return fsys.osFS.Readlink(name)
 }
 
+func (fsys *localFS) Stat(name string) (fs.FileInfo, error) {
+	if err := validPath("stat", name); err != nil {
+		return nil, err
+	}
+	return fsys.osFS.Stat(name)
+}
+
 func (fsys *localFS) Lstat(name string) (fs.FileInfo, error) {
 	if err := validPath("lstat", name); err != nil {
 		return nil, err

@@ -69,6 +69,25 @@ func (fsys *archiveFS) Close() error {
 	return nil
 }
 
+func (fsys *archiveFS) Stat(name string) (fs.FileInfo, error) {
+	if err := validPath("stat", name); err != nil {
+		return nil, err
+	}
+	f, err := fsys.fsys.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	stat, err := f.Stat()
+	closeErr := f.Close()
+	if err != nil {
+		if closeErr != nil {
+			return nil, errors.Join(err, closeErr)
+		}
+		return nil, err
+	}
+	return stat, nil
+}
+
 func (fsys *archiveFS) Create(name string) (File, error) {
 	if err := validPath("create", name); err != nil {
 		return nil, err

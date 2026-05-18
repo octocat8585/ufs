@@ -45,6 +45,7 @@ type ReadFS interface {
 	fs.ReadDirFS
 	fs.ReadFileFS
 	fs.ReadLinkFS
+	fs.StatFS
 }
 
 // FS represents a read-write file system.

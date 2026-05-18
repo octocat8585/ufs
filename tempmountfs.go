@@ -68,6 +68,10 @@ func (fsys *tempMountFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return fsys.lfs.ReadDir(name)
 }
 
+func (fsys *tempMountFS) Stat(name string) (fs.FileInfo, error) {
+	return fsys.lfs.Stat(name)
+}
+
 func (fsys *tempMountFS) Glob(pattern string) ([]string, error) {
 	return globFS(fsys, pattern)
 }
