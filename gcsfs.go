@@ -259,6 +259,26 @@ func (fsys *gcsFS) Open(name string) (fs.File, error) {
 	}, nil
 }
 
+func (fsys *gcsFS) Stat(name string) (fs.FileInfo, error) {
+	if err := validPath("stat", name); err != nil {
+		return nil, err
+	}
+
+	f, err := fsys.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	stat, err := f.Stat()
+	closeErr := f.Close()
+	if err != nil {
+		if closeErr != nil {
+			return nil, errors.Join(err, closeErr)
+		}
+		return nil, err
+	}
+	return stat, nil
+}
+
 // listDir lists the immediate children of a virtual GCS directory.
 // name is the FS-relative path; pass "" or cwdPath for the root.
 func (fsys *gcsFS) listDir(name string) ([]fs.DirEntry, error) {

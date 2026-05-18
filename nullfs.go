@@ -36,7 +36,7 @@ var (
 
 	nullDirStat = &fsInfo{
 		name:    "",
-		size:    0,
+		size:    emptyDirSize,
 		mode:    fs.ModeDir | fs.ModePerm,
 		modTime: unixEpochTime,
 		isDir:   true,
@@ -162,6 +162,13 @@ func (fsys *nullFS) ReadLink(name string) (string, error) {
 		return "", err
 	}
 	return "", pathError("readlink", name, fs.ErrInvalid)
+}
+
+func (fsys *nullFS) Stat(name string) (fs.FileInfo, error) {
+	if err := validPath("stat", name); err != nil {
+		return nil, err
+	}
+	return nullDirStat, nil
 }
 
 func (fsys *nullFS) Lstat(name string) (fs.FileInfo, error) {

@@ -52,6 +52,13 @@ type memNode struct {
 	modTime time.Time
 }
 
+func (n *memNode) size() int64 {
+	if n.mode.IsDir() {
+		return emptyDirSize
+	}
+	return int64(len(n.content))
+}
+
 type memNodeMap map[string]*memNode
 
 type memFile struct {
@@ -66,9 +73,13 @@ type memFile struct {
 }
 
 func (f *memFile) Stat() (fs.FileInfo, error) {
+	size := int64(len(f.content))
+	if f.mode.IsDir() {
+		size = int64(emptyDirSize)
+	}
 	return &fsInfo{
 		name:    path.Base(f.name),
-		size:    int64(len(f.content)),
+		size:    size,
 		mode:    f.mode,
 		modTime: f.modTime,
 		isDir:   f.mode.IsDir(),
@@ -192,7 +203,7 @@ func (f *memFile) Readdir(n int) ([]fs.FileInfo, error) {
 		if e != nil {
 			all = append(all, &fsInfo{
 				name:    e.name,
-				size:    int64(len(e.content)),
+				size:    e.size(),
 				mode:    e.mode,
 				modTime: e.modTime,
 				isDir:   e.mode.IsDir(),
@@ -421,10 +432,46 @@ func (fsys *memFS) ReadLink(name string) (string, error) {
 	return "", pathError("readlink", name, fs.ErrInvalid)
 }
 
+func (fsys *memFS) Stat(name string) (fs.FileInfo, error) {
+	// Root directory is never stored in the map.
+	if name == cwdPath {
+		return &fsInfo{
+			name:    cwdPath,
+			size:    emptyDirSize,
+			mode:    fs.ModeDir,
+			modTime: unixEpochTime,
+			isDir:   true,
+		}, nil
+	}
+	if err := validPath("lstat", name); err != nil {
+		return nil, err
+	}
+	fsys.mu.RLock()
+	defer fsys.mu.RUnlock()
+	e, err := fsys.findEnt(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &fsInfo{
+		name:    e.name,
+		size:    e.size(),
+		mode:    e.mode,
+		modTime: e.modTime,
+		isDir:   e.mode.IsDir(),
+	}, nil
+}
+
 func (fsys *memFS) Lstat(name string) (fs.FileInfo, error) {
 	// Root directory is never stored in the map.
 	if name == cwdPath {
-		return &fsInfo{name: cwdPath, mode: fs.ModeDir, isDir: true}, nil
+		return &fsInfo{
+			name:    cwdPath,
+			size:    emptyDirSize,
+			mode:    fs.ModeDir,
+			modTime: unixEpochTime,
+			isDir:   true,
+		}, nil
 	}
 	if err := validPath("lstat", name); err != nil {
 		return nil, err
@@ -437,7 +484,7 @@ func (fsys *memFS) Lstat(name string) (fs.FileInfo, error) {
 	}
 	return &fsInfo{
 		name:    e.name,
-		size:    int64(len(e.content)),
+		size:    e.size(),
 		mode:    e.mode,
 		modTime: e.modTime,
 		isDir:   e.mode.IsDir(),

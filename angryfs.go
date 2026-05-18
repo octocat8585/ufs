@@ -52,6 +52,13 @@ func (fsys *angryFS) Close() error {
 	return errAngry
 }
 
+func (fsys *angryFS) Stat(name string) (fs.FileInfo, error) {
+	if err := validPath("stat", name); err != nil {
+		return nil, err
+	}
+	return nil, errAngry
+}
+
 func (fsys *angryFS) Create(name string) (File, error) {
 	if err := validPath("create", name); err != nil {
 		return nil, err
