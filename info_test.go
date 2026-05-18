@@ -28,7 +28,7 @@ func TestInfoDir(t *testing.T) {
 	sysVal := struct{ x int }{x: 42}
 	info := &fsInfo{
 		name:    "mydir",
-		size:    4096,
+		size:    5000,
 		mode:    fs.ModeDir | fs.ModePerm,
 		modTime: tNow,
 		isDir:   true,
@@ -37,8 +37,8 @@ func TestInfoDir(t *testing.T) {
 	if info.Name() != "mydir" {
 		t.Errorf("Name() = %q, want %q", info.Name(), "mydir")
 	}
-	if info.Size() != 4096 {
-		t.Errorf("Size() = %d, want 4096", info.Size())
+	if info.Size() != 5000 {
+		t.Errorf("Size() = %d, want 5000", info.Size())
 	}
 	if info.Mode() != fs.ModeDir|fs.ModePerm {
 		t.Errorf("Mode() = %v, want %v", info.Mode(), fs.ModeDir|fs.ModePerm)

@@ -38,11 +38,8 @@ const (
 )
 
 var (
-	_ FS            = (*gcsFS)(nil)
-	_ fs.ReadFileFS = (*gcsFS)(nil)
-	_ fs.ReadDirFS  = (*gcsFS)(nil)
-	_ fs.ReadLinkFS = (*gcsFS)(nil)
-	_ File          = (*gcsFile)(nil)
+	_ FS   = (*gcsFS)(nil)
+	_ File = (*gcsFile)(nil)
 )
 
 type gcsFS struct {

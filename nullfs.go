@@ -28,9 +28,6 @@ const (
 var (
 	_ File           = (*nullFile)(nil)
 	_ FS             = (*nullFS)(nil)
-	_ fs.ReadFileFS  = (*nullFS)(nil)
-	_ fs.ReadDirFS   = (*nullFS)(nil)
-	_ fs.ReadLinkFS  = (*nullFS)(nil)
 	_ fs.GlobFS      = (*nullFS)(nil)
 	_ fs.ReadDirFile = (*nullReadDirFile)(nil)
 
@@ -51,12 +48,14 @@ type nullFile struct {
 func (n *nullFile) Stat() (fs.FileInfo, error) {
 	isDir := isDirName(n.name)
 	mode := fs.ModePerm
+	size := int64(0)
 	if isDir {
 		mode = fs.ModeDir | fs.ModePerm
+		size = emptyDirSize
 	}
 	return &fsInfo{
 		name:    n.name,
-		size:    0,
+		size:    size,
 		mode:    mode,
 		modTime: unixEpochTime,
 		isDir:   isDir,
@@ -177,12 +176,14 @@ func (fsys *nullFS) Lstat(name string) (fs.FileInfo, error) {
 	}
 	isDir := isDirName(name)
 	mode := fs.ModePerm
+	size := int64(0)
 	if isDir {
 		mode = fs.ModeDir | fs.ModePerm
+		size = emptyDirSize
 	}
 	return &fsInfo{
 		name:    name,
-		size:    0,
+		size:    size,
 		mode:    mode,
 		modTime: unixEpochTime,
 		isDir:   isDir,

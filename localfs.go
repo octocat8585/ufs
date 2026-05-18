@@ -34,9 +34,6 @@ var (
 
 type localFSInterface interface {
 	FS
-	fs.ReadFileFS
-	fs.ReadLinkFS
-	fs.ReadDirFS
 	fs.GlobFS
 }
 
