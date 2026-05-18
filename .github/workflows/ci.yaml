@@ -20,8 +20,8 @@ on:
   pull_request:
     branches: ["main"]
 jobs:
-  build:
-    runs-on: self-hosted
+  build-linux:
+    runs-on: ["self-hosted", "linux"]
     # runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -30,19 +30,19 @@ jobs:
         - "stable"
         # - "oldstable"
         goos:
-        #- "darwin"
-        #- "freebsd"
+        - "darwin"
+        - "freebsd"
         - "linux"
-        #- "netbsd"
-        #- "openbsd"
-        #- "windows"
+        - "netbsd"
+        - "openbsd"
+        - "windows"
         # Doesn't work
         #- "android"
         #- "ios"
         goarch:
         - "amd64"
-        #- "arm"
-        #- "arm64"
+        - "arm"
+        - "arm64"
         exclude:
         - goos: "darwin"
           goarch: "arm"
@@ -65,8 +65,74 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Build
-        run: GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build ./...
+        run: go build ./...
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
       - name: Test
-        run: CGO_ENABLED=0 go test ./...
+        run: go test ./...
+        env:
+          CGO_ENABLED: 0
       - name: Test (Race Test)
-        run: CGO_ENABLED=1 go test -race -count 10 ./...
+        run: go test -race -count 10 ./...
+        env:
+          CGO_ENABLED: 1
+  build-windows:
+    runs-on: ["self-hosted", "windows"]
+    # runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version:
+        - "stable"
+        # - "oldstable"
+        goos:
+        #- "darwin"
+        #- "freebsd"
+        #- "linux"
+        #- "netbsd"
+        #- "openbsd"
+        - "windows"
+        # Doesn't work
+        #- "android"
+        #- "ios"
+        goarch:
+        - "amd64"
+        - "arm"
+        - "arm64"
+        exclude:
+        - goos: "darwin"
+          goarch: "arm"
+        - goos: "ios"
+          goarch: "arm"
+        - goos: "windows"
+          goarch: "arm"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go-version }}
+      # You can test your matrix by printing the current Go version
+      - name: Display Go version
+        run: go version
+      - name: Format
+        run: go fmt ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Build
+        run: go build ./...
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+      - name: Test
+        run: go test ./...
+        env:
+          CGO_ENABLED: 0
+      - name: Test (Race Test)
+        run: go test -race -count 10 ./...
+        env:
+          CGO_ENABLED: 1

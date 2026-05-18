@@ -29,7 +29,7 @@ make presubmit
 
 ## Architecture
 
-`ufs` is a Go library providing a unified virtual file system abstraction. The module is `github.com/jeremyje/ufs`.
+`ufs` is a Go library providing a unified virtual file system abstraction. The module is `github.com/cloudfra/ufs`.
 
 ### Core interfaces (`ufs.go`)
 
