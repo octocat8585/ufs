@@ -27,12 +27,8 @@ import (
 )
 
 var (
-	_ FS            = (*nestFS)(nil)
-	_ fs.ReadDirFS  = (*nestFS)(nil)
-	_ fs.ReadFileFS = (*nestFS)(nil)
-	_ fs.ReadLinkFS = (*nestFS)(nil)
-	_ fs.GlobFS     = (*nestFS)(nil)
-	_ fs.StatFS     = (*nestFS)(nil)
+	_ FS        = (*nestFS)(nil)
+	_ fs.GlobFS = (*nestFS)(nil)
 )
 
 func getPotentialArchives(name string) []string {

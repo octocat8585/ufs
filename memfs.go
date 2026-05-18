@@ -31,12 +31,17 @@ const (
 )
 
 var (
-	_ File          = (*memFile)(nil)
-	_ FS            = (*memFS)(nil)
-	_ fs.ReadFileFS = (*memFS)(nil)
-	_ fs.ReadDirFS  = (*memFS)(nil)
-	_ fs.ReadLinkFS = (*memFS)(nil)
-	_ fs.GlobFS     = (*memFS)(nil)
+	_ File      = (*memFile)(nil)
+	_ FS        = (*memFS)(nil)
+	_ fs.GlobFS = (*memFS)(nil)
+
+	memFSCwdInfo = &fsInfo{
+		name:    cwdPath,
+		size:    emptyDirSize,
+		mode:    fs.ModeDir,
+		modTime: unixEpochTime,
+		isDir:   true,
+	}
 )
 
 type memFS struct {
@@ -435,13 +440,7 @@ func (fsys *memFS) ReadLink(name string) (string, error) {
 func (fsys *memFS) Stat(name string) (fs.FileInfo, error) {
 	// Root directory is never stored in the map.
 	if name == cwdPath {
-		return &fsInfo{
-			name:    cwdPath,
-			size:    emptyDirSize,
-			mode:    fs.ModeDir,
-			modTime: unixEpochTime,
-			isDir:   true,
-		}, nil
+		return memFSCwdInfo, nil
 	}
 	if err := validPath("lstat", name); err != nil {
 		return nil, err
@@ -465,13 +464,7 @@ func (fsys *memFS) Stat(name string) (fs.FileInfo, error) {
 func (fsys *memFS) Lstat(name string) (fs.FileInfo, error) {
 	// Root directory is never stored in the map.
 	if name == cwdPath {
-		return &fsInfo{
-			name:    cwdPath,
-			size:    emptyDirSize,
-			mode:    fs.ModeDir,
-			modTime: unixEpochTime,
-			isDir:   true,
-		}, nil
+		return memFSCwdInfo, nil
 	}
 	if err := validPath("lstat", name); err != nil {
 		return nil, err

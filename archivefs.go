@@ -31,9 +31,7 @@ const (
 )
 
 var (
-	_ FS            = (*archiveFS)(nil)
-	_ fs.ReadFileFS = (*archiveFS)(nil)
-	_ fs.ReadDirFS  = (*archiveFS)(nil)
+	_ FS = (*archiveFS)(nil)
 
 	archiveExtList = []string{".tar", ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz4", ".tar.br", ".tar.zst", ".rar", ".zip", ".7z"}
 )
