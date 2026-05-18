@@ -18,7 +18,7 @@ jobs:
   # https://github.com/marketplace/actions/run-misspell-with-reviewdog
   misspell:
     name: runner / misspell
-    runs-on: self-hosted
+    runs-on: ["self-hosted", "linux"]
     # runs-on: ubuntu-latest
     steps:
       - name: Check out code.
@@ -34,7 +34,7 @@ jobs:
   # https://github.com/marketplace/actions/run-codespell-with-reviewdog
   codespell:
     name: runner / codespell
-    runs-on: self-hosted
+    runs-on: ["self-hosted", "linux"]
     # runs-on: ubuntu-latest
     steps:
       - name: Check out code.
