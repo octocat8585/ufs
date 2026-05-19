@@ -213,7 +213,3 @@ func newTempMountRemoteArchiveFS(name string) (FS, error) {
 	}
 	return makeTempMountFS(fsys, tempDir, cleanup), nil
 }
-
-func isArchiveUri(name string) bool {
-	return isLocalFSUri(name) && isMountableArchivePath(name)
-}

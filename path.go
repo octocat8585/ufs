@@ -17,30 +17,29 @@ package ufs
 import (
 	"fmt"
 	"io/fs"
-	"os"
-	"path/filepath"
+	"path"
 	"runtime"
 	"strings"
 )
 
 const (
-	pathSeparator             = string(os.PathSeparator)
 	unixPathSeparator         = "/"
 	windowsPathSeparator      = "\\"
 	cwdPath                   = "."
 	unixAndWindowsSlashCutset = unixPathSeparator + windowsPathSeparator
+	emptyDirSize              = 0
 )
 
-func removePathPrefix(path string, removePath string) (string, bool) {
-	removePath = filepath.Clean(removePath)
-	path = filepath.Clean(path)
+func removePathPrefix(name string, removePath string) (string, bool) {
+	removePath = path.Clean(removePath)
+	name = path.Clean(name)
 	if isCwd(removePath) {
-		return path, true
+		return name, true
 	}
-	if removePath == path {
+	if removePath == name {
 		return cwdPath, true
 	}
-	return strings.CutPrefix(path, removePath+pathSeparator)
+	return strings.CutPrefix(name, removePath+unixPathSeparator)
 }
 
 func trimSlash(name string) string {
@@ -48,7 +47,7 @@ func trimSlash(name string) string {
 }
 
 func splitPath(name string) []string {
-	return strings.Split(trimSlash(name), pathSeparator)
+	return strings.Split(trimSlash(name), unixPathSeparator)
 }
 
 func validPath(op string, name string) error {
@@ -63,7 +62,7 @@ func coerceUnix(name string) string {
 }
 
 func isDirName(name string) bool {
-	return isCwd(name) || strings.HasSuffix(name, pathSeparator)
+	return isCwd(name) || strings.HasSuffix(name, unixPathSeparator)
 }
 
 func isCwd(name string) bool {

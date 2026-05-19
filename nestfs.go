@@ -19,8 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
-	"path/filepath"
+	"path"
 	"slices"
 	"sort"
 	"strings"
@@ -32,11 +31,11 @@ var (
 )
 
 func getPotentialArchives(name string) []string {
-	components := strings.Split(name, string(os.PathSeparator))
+	components := strings.Split(name, unixPathSeparator)
 	potentials := []string{}
 	for idx, component := range components {
 		if strings.HasSuffix(component, archiveDirExt) {
-			potentials = append(potentials, filepath.Join(components[0:idx+1]...))
+			potentials = append(potentials, strings.Join(components[0:idx+1], unixPathSeparator))
 		}
 	}
 	return potentials
@@ -56,12 +55,12 @@ func (m *mountMap) put(name string, fsys *nestFS) error {
 			return pathError("mount", name, fmt.Errorf("mount %q is nested within %q. To correct, mount %q as %q within %q. mounts: %s, %+v", name, mountPoint, name, subName, mountPoint, m.baseName, m.m))
 		}
 	}
-	m.m[filepath.Clean(name)] = fsys
+	m.m[path.Clean(name)] = fsys
 	return nil
 }
 
 func (m *mountMap) getDirectoryList(name string) []string {
-	name = filepath.Clean(name)
+	name = path.Clean(name)
 	// If there's a mount that should handle the directory listing then we should defer to that.
 	if _, ok := m.m[name]; ok {
 		return []string{}
@@ -84,7 +83,7 @@ func (m *mountMap) getDirectoryList(name string) []string {
 }
 
 func (m *mountMap) getMatchesBySubPath(name string) map[string]*nestFS {
-	name = filepath.Clean(name)
+	name = path.Clean(name)
 	if fsys, ok := m.m[name]; ok {
 		return map[string]*nestFS{
 			"": fsys,
@@ -102,7 +101,7 @@ func (m *mountMap) getMatchesBySubPath(name string) map[string]*nestFS {
 }
 
 func (m *mountMap) getMount(name string) *nestFS {
-	name = filepath.Clean(name)
+	name = path.Clean(name)
 	nFS, ok := m.m[name]
 	if !ok {
 		return nil
@@ -111,7 +110,7 @@ func (m *mountMap) getMount(name string) *nestFS {
 }
 
 func (m *mountMap) getMountX(name string) (string, string, *nestFS, bool) {
-	name = filepath.Clean(name)
+	name = path.Clean(name)
 	if isCwd(name) {
 		return "", "", nil, false
 	}

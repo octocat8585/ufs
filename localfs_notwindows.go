@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,10 +13,22 @@
 // limitations under the License.
 
 //go:build !windows
-// +build !windows
 
 package ufs
 
-const (
-	emptyDirSize = 0
+import (
+	"io/fs"
+	"os"
 )
+
+func validLocalPath(op, name string) error {
+	return validPath(op, name)
+}
+
+func localFSWrapFile(f *os.File) fs.File {
+	return f
+}
+
+func localFSNormalizeDirInfo(fi fs.FileInfo) fs.FileInfo {
+	return fi
+}

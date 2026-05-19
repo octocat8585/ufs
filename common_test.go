@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"path/filepath"
+	"path"
 	"reflect"
 	"sort"
 	"strings"
@@ -218,8 +218,8 @@ func TestFSReadDir(t *testing.T) {
 			t.Parallel()
 			fsys := fsysTC.createFS(t)
 
-			dirs := coerceOSSlashList([]string{"a", "b", "b/a/c", "b/b", "b/c", "c", "d/e/f/g", "d/e/g", "a/b/c/d/e/f/g"})
-			lsMap := coerceOSSlashMap(map[string][]string{
+			dirs := []string{"a", "b", "b/a/c", "b/b", "b/c", "c", "d/e/f/g", "d/e/g", "a/b/c/d/e/f/g"}
+			lsMap := map[string][]string{
 				".":             {"a", "b", "c", "d"},
 				"a":             {"b"},
 				"b":             {"a", "b", "c"},
@@ -239,7 +239,7 @@ func TestFSReadDir(t *testing.T) {
 				"a/b/c/d/e":     {"f"},
 				"a/b/c/d/e/f":   {"g"},
 				"a/b/c/d/e/f/g": {},
-			})
+			}
 
 			for _, dir := range dirs {
 				t.Run(fmt.Sprintf("MkdirAll/%s", dir), func(t *testing.T) {
@@ -295,11 +295,7 @@ func TestFSCreate(t *testing.T) {
 
 			for _, filename := range filenames {
 				t.Run(fmt.Sprintf("Create/%s", filename), func(t *testing.T) {
-					dir, _ := filepath.Split(filename)
-					dir = strings.Trim(dir, pathSeparator)
-					if dir == "" {
-						dir = "."
-					}
+					dir := path.Dir(filename)
 					if err := fsys.MkdirAll(dir, fs.ModePerm); err != nil {
 						t.Errorf("cannot Mkdir(%q), %s", dir, err)
 					}
@@ -378,18 +374,3 @@ func TestFSCreate(t *testing.T) {
 	}
 }
 
-func coerceOSSlashList(pathList []string) []string {
-	result := make([]string, len(pathList))
-	for i, path := range pathList {
-		result[i] = filepath.FromSlash(path)
-	}
-	return result
-}
-
-func coerceOSSlashMap[T any](m map[string]T) map[string]T {
-	result := make(map[string]T, len(m))
-	for path, val := range m {
-		result[filepath.FromSlash(path)] = val
-	}
-	return result
-}

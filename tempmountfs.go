@@ -30,7 +30,7 @@ type tempMountFS struct {
 }
 
 func (fsys *tempMountFS) String() string {
-	return fsys.name
+	return coerceUnix(fsys.name)
 }
 
 func (fsys *tempMountFS) Open(name string) (fs.File, error) {

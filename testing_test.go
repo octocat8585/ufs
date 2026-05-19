@@ -19,7 +19,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
+	"path"
 	"reflect"
 	"runtime"
 	"sort"
@@ -61,7 +61,7 @@ var (
 				})
 				return fsys
 			},
-			wantString: os.TempDir(),
+			wantString: osTempDir(),
 		},
 		{
 			name: "tempMountFS",
@@ -75,7 +75,7 @@ var (
 				})
 				return fsys
 			},
-			wantString: os.TempDir(),
+			wantString: osTempDir(),
 		},
 		{
 			name: "memFS",
@@ -152,11 +152,11 @@ func testFileSystem(t *testing.T, newFSFunc func(name string) (FS, error), name 
 	t.Helper()
 	fsys := mustFS(t, newFSFunc, name)
 
-	wantFiles := []string{"a", filepath.Join("ab", "b", "c"), filepath.Join("ab", "d", "c"), "def", "abc", "abc.txt", filepath.Join("temp", "abc.txt")}
+	wantFiles := []string{"a", "ab/b/c", "ab/d/c", "def", "abc", "abc.txt", "temp/abc.txt"}
 
-	mkdirForTest(t, fsys, "ab", "b")
+	mkdirForTest(t, fsys, "ab/b")
 	mkdirForTest(t, fsys, "temp")
-	mkdirForTest(t, fsys, "ab", "d")
+	mkdirForTest(t, fsys, "ab/d")
 
 	for _, name := range wantFiles {
 		t.Run(fmt.Sprintf("crud_%s", name), func(t *testing.T) {
@@ -223,9 +223,9 @@ func testFileSystem(t *testing.T, newFSFunc func(name string) (FS, error), name 
 
 func mkdirForTest(tb testing.TB, fsys FS, dirs ...string) {
 	tb.Helper()
-	path := filepath.Join(dirs...)
-	if err := fsys.MkdirAll(path, fs.ModePerm); err != nil {
-		tb.Fatalf("cannot create directory %q, %s", path, err)
+	dir := path.Join(dirs...)
+	if err := fsys.MkdirAll(dir, fs.ModePerm); err != nil {
+		tb.Fatalf("cannot create directory %q, %s", dir, err)
 	}
 }
 
@@ -245,6 +245,10 @@ func mustFS(tb testing.TB, newFSFunc func(name string) (FS, error), name string)
 
 func randomString(size int) string {
 	return randomstring.HumanFriendlyString(size)
+}
+
+func osTempDir() string {
+	return coerceUnix(os.TempDir())
 }
 
 func mustTemp(tb testing.TB) string {
