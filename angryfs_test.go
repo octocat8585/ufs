@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"errors"
 	"io/fs"
 	"testing"
 )
@@ -51,7 +52,7 @@ func TestAngryFSOpen(t *testing.T) {
 		t.Run(tc, func(t *testing.T) {
 			fsys := mustAngryFS(t)
 			_, err := fsys.Open(tc)
-			if err != fs.ErrInvalid {
+			if !errors.Is(err, fs.ErrInvalid) {
 				t.Errorf("Open(%q) = %v, want %v", tc, err, fs.ErrInvalid)
 			}
 		})
@@ -69,7 +70,7 @@ func TestAngryFSMkdirAll(t *testing.T) {
 	for _, tc := range []string{"a", "a/b", "a/b/c", "abc", "null"} {
 		t.Run(tc, func(t *testing.T) {
 			fsys := mustAngryFS(t)
-			if err := fsys.MkdirAll(tc, fs.ModePerm); err != fs.ErrInvalid {
+			if err := fsys.MkdirAll(tc, fs.ModePerm); !errors.Is(err, fs.ErrInvalid) {
 				t.Errorf("MkdirAll(%q) = %v, want %v", tc, err, fs.ErrInvalid)
 			}
 		})
@@ -80,7 +81,7 @@ func TestAngryFSReadFile(t *testing.T) {
 	for _, tc := range testassetFilenameList {
 		t.Run(tc, func(t *testing.T) {
 			fsys := mustAngryFS(t)
-			if _, err := fsys.ReadFile(tc); err != fs.ErrInvalid {
+			if _, err := fsys.ReadFile(tc); !errors.Is(err, fs.ErrInvalid) {
 				t.Errorf("ReadFile(%q) = %v, want %v", tc, err, fs.ErrInvalid)
 			}
 		})
@@ -91,7 +92,7 @@ func TestAngryFSReadLink(t *testing.T) {
 	for _, tc := range testassetFilenameList {
 		t.Run(tc, func(t *testing.T) {
 			fsys := mustAngryFS(t)
-			if _, err := fsys.ReadLink(tc); err != fs.ErrInvalid {
+			if _, err := fsys.ReadLink(tc); !errors.Is(err, fs.ErrInvalid) {
 				t.Errorf("ReadLink(%q) = %v, want %v", tc, err, fs.ErrInvalid)
 			}
 		})
@@ -102,7 +103,7 @@ func TestAngryFSLstat(t *testing.T) {
 	for _, tc := range testassetFilenameList {
 		t.Run(tc, func(t *testing.T) {
 			fsys := mustAngryFS(t)
-			if _, err := fsys.Lstat(tc); err != fs.ErrInvalid {
+			if _, err := fsys.Lstat(tc); !errors.Is(err, fs.ErrInvalid) {
 				t.Errorf("Lstat(%q) = %v, want %v", tc, err, fs.ErrInvalid)
 			}
 		})
@@ -113,7 +114,7 @@ func TestAngryFSReadDir(t *testing.T) {
 	for tcDirName := range testassetDirList {
 		t.Run(tcDirName, func(t *testing.T) {
 			fsys := mustAngryFS(t)
-			if _, err := fsys.ReadDir(tcDirName); err != fs.ErrInvalid {
+			if _, err := fsys.ReadDir(tcDirName); !errors.Is(err, fs.ErrInvalid) {
 				t.Errorf("ReadDir(%q) = %v, want %v", tcDirName, err, fs.ErrInvalid)
 			}
 		})
@@ -131,7 +132,7 @@ func TestAngryFSCreate(t *testing.T) {
 	for _, tc := range testassetCreateFileList {
 		t.Run(tc, func(t *testing.T) {
 			fsys := mustAngryFS(t)
-			if _, err := fsys.Create(tc); err != fs.ErrInvalid {
+			if _, err := fsys.Create(tc); !errors.Is(err, fs.ErrInvalid) {
 				t.Errorf("Create(%q) = %v, want %v", tc, err, fs.ErrInvalid)
 			}
 		})

@@ -445,7 +445,7 @@ func (fsys *nestFS) validPath(op string, name string) error {
 		return err
 	}
 	if fsys.fsys == nil {
-		return fmt.Errorf("cannot %s %q, file system is closed", op, name)
+		return pathError(op, name, fs.ErrClosed)
 	}
 	return nil
 }

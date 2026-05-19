@@ -75,15 +75,12 @@ func (fsys *archiveFS) Stat(name string) (fs.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	stat, err := f.Stat()
+	stat, statErr := f.Stat()
 	closeErr := f.Close()
-	if err != nil {
-		if closeErr != nil {
-			return nil, errors.Join(err, closeErr)
-		}
-		return nil, err
+	if statErr != nil {
+		return nil, joinErrors(statErr, closeErr)
 	}
-	return stat, nil
+	return stat, closeErr
 }
 
 func (fsys *archiveFS) Create(name string) (File, error) {
@@ -115,11 +112,16 @@ func (fsys *archiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 }
 
 func (fsys *archiveFS) ReadLink(name string) (string, error) {
-	return "", pathError("readlink", name, fmt.Errorf("readlink not supported for '%s' in archiveFS", name))
+	if err := validPath("readlink", name); err != nil {
+		return "", err
+	}
+	// Archives contain no symlinks; every path is a regular file or directory.
+	return "", pathError("readlink", name, fs.ErrInvalid)
 }
 
 func (fsys *archiveFS) Lstat(name string) (fs.FileInfo, error) {
-	return nil, pathError("lstat", name, fmt.Errorf("lstat not supported for '%s' in archiveFS", name))
+	// Archives contain no symlinks, so Lstat == Stat.
+	return fsys.Stat(name)
 }
 
 func newArchiveFSFromLocalFS(ctx context.Context, name string) (*archiveFS, error) {
