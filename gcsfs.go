@@ -130,11 +130,12 @@ func (f *gcsFile) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekEnd:
 		f.offset = int64(len(f.content)) + offset
 	default:
-		return 0, errors.New("invalid whence")
+		return 0, pathError("seek", f.name, fmt.Errorf("offset=%d whence=%d: invalid whence: %w", offset, whence, fs.ErrInvalid))
 	}
 	if f.offset < 0 {
+		computed := f.offset
 		f.offset = 0
-		return 0, errors.New("negative offset")
+		return 0, pathError("seek", f.name, fmt.Errorf("offset=%d whence=%d: position %d is before start of file: %w", offset, whence, computed, fs.ErrInvalid))
 	}
 	return f.offset, nil
 }
@@ -265,15 +266,12 @@ func (fsys *gcsFS) Stat(name string) (fs.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	stat, err := f.Stat()
+	stat, statErr := f.Stat()
 	closeErr := f.Close()
-	if err != nil {
-		if closeErr != nil {
-			return nil, errors.Join(err, closeErr)
-		}
-		return nil, err
+	if statErr != nil {
+		return nil, joinErrors(statErr, closeErr)
 	}
-	return stat, nil
+	return stat, closeErr
 }
 
 // listDir lists the immediate children of a virtual GCS directory.

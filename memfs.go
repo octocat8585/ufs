@@ -16,7 +16,6 @@ package ufs
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -158,10 +157,10 @@ func (f *memFile) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekEnd:
 		newOffset = int64(len(f.content)) + offset
 	default:
-		return 0, errors.New("invalid whence")
+		return 0, pathError("seek", f.path, fmt.Errorf("offset=%d whence=%d: invalid whence: %w", offset, whence, fs.ErrInvalid))
 	}
 	if newOffset < 0 {
-		return 0, errors.New("negative offset")
+		return 0, pathError("seek", f.path, fmt.Errorf("offset=%d whence=%d: position %d is before start of file: %w", offset, whence, newOffset, fs.ErrInvalid))
 	}
 	f.offset = newOffset
 	return f.offset, nil

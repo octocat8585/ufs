@@ -42,7 +42,7 @@ func (fsys *angryFS) Open(name string) (fs.File, error) {
 	if err := validPath("open", name); err != nil {
 		return nil, err
 	}
-	return nil, errAngry
+	return nil, pathError("open", name, errAngry)
 }
 
 func (fsys *angryFS) Close() error {
@@ -53,50 +53,49 @@ func (fsys *angryFS) Stat(name string) (fs.FileInfo, error) {
 	if err := validPath("stat", name); err != nil {
 		return nil, err
 	}
-	return nil, errAngry
+	return nil, pathError("stat", name, errAngry)
 }
 
 func (fsys *angryFS) Create(name string) (File, error) {
 	if err := validPath("create", name); err != nil {
 		return nil, err
 	}
-
-	return nil, errAngry
+	return nil, pathError("create", name, errAngry)
 }
 
 func (fsys *angryFS) MkdirAll(name string, perm fs.FileMode) error {
 	if err := validPath("mkdir", name); err != nil {
 		return err
 	}
-	return errAngry
+	return pathError("mkdir", name, errAngry)
 }
 
 func (fsys *angryFS) ReadFile(name string) ([]byte, error) {
 	if err := validPath("readfile", name); err != nil {
 		return nil, err
 	}
-	return nil, errAngry
+	return nil, pathError("readfile", name, errAngry)
 }
 
 func (fsys *angryFS) ReadLink(name string) (string, error) {
 	if err := validPath("readlink", name); err != nil {
 		return "", err
 	}
-	return "", errAngry
+	return "", pathError("readlink", name, errAngry)
 }
 
 func (fsys *angryFS) Lstat(name string) (fs.FileInfo, error) {
 	if err := validPath("lstat", name); err != nil {
 		return nil, err
 	}
-	return nil, errAngry
+	return nil, pathError("lstat", name, errAngry)
 }
 
 func (fsys *angryFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	if err := validPath("readdir", name); err != nil {
 		return nil, err
 	}
-	return nil, errAngry
+	return nil, pathError("readdir", name, errAngry)
 }
 
 func (fsys *angryFS) Glob(pattern string) ([]string, error) {
