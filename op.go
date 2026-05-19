@@ -17,7 +17,7 @@ package ufs
 import (
 	"io"
 	"io/fs"
-	"path/filepath"
+	"path"
 	"sort"
 )
 
@@ -25,8 +25,8 @@ import (
 func Rsync(srcFS fs.FS, destFS FS, dir string) error {
 	// TODO: Prevent archive traversal.
 	return ForEachFilename(srcFS, dir, func(name string) error {
-		dir, _ := filepath.Split(name)
-		dir = filepath.Clean(dir)
+		dir, _ := path.Split(name)
+		dir = path.Clean(dir)
 		if err := destFS.MkdirAll(dir, fs.ModePerm); err != nil {
 			return err
 		}

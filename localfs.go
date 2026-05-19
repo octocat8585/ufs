@@ -42,7 +42,7 @@ type localFS struct {
 }
 
 func (fsys *localFS) String() string {
-	return fsys.osFS.Name()
+	return coerceUnix(fsys.osFS.Name())
 }
 
 func (fsys *localFS) getAbsPath(name string) (string, error) {
@@ -50,10 +50,14 @@ func (fsys *localFS) getAbsPath(name string) (string, error) {
 }
 
 func (fsys *localFS) Open(name string) (fs.File, error) {
-	if err := validPath("open", name); err != nil {
+	if err := validLocalPath("open", name); err != nil {
 		return nil, err
 	}
-	return fsys.osFS.Open(name)
+	f, err := fsys.osFS.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	return localFSWrapFile(f), nil
 }
 
 func (fsys *localFS) Close() error {
@@ -61,50 +65,57 @@ func (fsys *localFS) Close() error {
 }
 
 func (fsys *localFS) Create(name string) (File, error) {
-	if err := validPath("create", name); err != nil {
+	if err := validLocalPath("create", name); err != nil {
 		return nil, err
 	}
-
 	return fsys.osFS.Create(name)
 }
 
 func (fsys *localFS) MkdirAll(name string, perm fs.FileMode) error {
-	if err := validPath("mkdir", name); err != nil {
+	if err := validLocalPath("mkdir", name); err != nil {
 		return err
 	}
 	return fsys.osFS.MkdirAll(name, perm)
 }
 
 func (fsys *localFS) ReadFile(name string) ([]byte, error) {
-	if err := validPath("readfile", name); err != nil {
+	if err := validLocalPath("readfile", name); err != nil {
 		return nil, err
 	}
 	return fsys.osFS.ReadFile(name)
 }
 
 func (fsys *localFS) ReadLink(name string) (string, error) {
-	if err := validPath("readlink", name); err != nil {
+	if err := validLocalPath("readlink", name); err != nil {
 		return "", err
 	}
 	return fsys.osFS.Readlink(name)
 }
 
 func (fsys *localFS) Stat(name string) (fs.FileInfo, error) {
-	if err := validPath("stat", name); err != nil {
+	if err := validLocalPath("stat", name); err != nil {
 		return nil, err
 	}
-	return fsys.osFS.Stat(name)
+	fi, err := fsys.osFS.Stat(name)
+	if err != nil {
+		return nil, err
+	}
+	return localFSNormalizeDirInfo(fi), nil
 }
 
 func (fsys *localFS) Lstat(name string) (fs.FileInfo, error) {
-	if err := validPath("lstat", name); err != nil {
+	if err := validLocalPath("lstat", name); err != nil {
 		return nil, err
 	}
-	return fsys.osFS.Lstat(name)
+	fi, err := fsys.osFS.Lstat(name)
+	if err != nil {
+		return nil, err
+	}
+	return localFSNormalizeDirInfo(fi), nil
 }
 
 func (fsys *localFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	if err := validPath("readdir", name); err != nil {
+	if err := validLocalPath("readdir", name); err != nil {
 		return nil, err
 	}
 	f, err := fsys.osFS.Open(name)
@@ -194,3 +205,4 @@ func newLocalFS(name string) (FS, error) {
 func isLocalFSUri(name string) bool {
 	return strings.HasPrefix(name, localFSPrefix) || !strings.Contains(name, "://")
 }
+

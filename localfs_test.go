@@ -76,7 +76,7 @@ func TestLocalFSLstat(t *testing.T) {
 	f.Close()
 
 	if err := os.Symlink("lstat_file.txt", filepath.Join(dir, "lstat_link.txt")); err != nil {
-		t.Fatalf("Symlink failed: %v", err)
+		t.Skipf("skipping: symlink creation requires elevated privileges or Developer Mode on Windows: %v", err)
 	}
 
 	lfs, ok := fsys.(fs.ReadLinkFS)
@@ -120,7 +120,7 @@ func TestLocalFSReadLink(t *testing.T) {
 	f.Close()
 
 	if err := os.Symlink("target.txt", filepath.Join(dir, "link.txt")); err != nil {
-		t.Fatalf("Symlink failed: %v", err)
+		t.Skipf("skipping: symlink creation requires elevated privileges or Developer Mode on Windows: %v", err)
 	}
 
 	lfs, ok := fsys.(fs.ReadLinkFS)
@@ -135,22 +135,6 @@ func TestLocalFSReadLink(t *testing.T) {
 	if got != "target.txt" {
 		t.Errorf("ReadLink = %q, want %q", got, "target.txt")
 	}
-}
-
-func mustLocalFS(tb testing.TB) *localFS {
-	dir := mustTemp(tb)
-	srcFS, err := makeLocalFS(testLocalFSName)
-	if err != nil {
-		tb.Fatalf("newLocalFS(%q) returned error, %s", testLocalFSName, err)
-	}
-	fsys, err := makeLocalFS(dir)
-	if err != nil {
-		tb.Fatalf("newLocalFS(%q) returned error, %s", dir, err)
-	}
-	if err := Rsync(srcFS, fsys, cwdPath); err != nil {
-		tb.Fatalf("cannot Rsync from %q to %q", testLocalFSName, dir)
-	}
-	return fsys
 }
 
 func TestLocalFSReadDirDoesNotContainCwd(t *testing.T) {
