@@ -17,6 +17,7 @@ package ufs
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"path"
@@ -31,74 +32,75 @@ const (
 )
 
 var (
-	_ File      = (*memFile)(nil)
-	_ FS        = (*memFS)(nil)
-	_ fs.GlobFS = (*memFS)(nil)
-
-	memFSCwdInfo = &fsInfo{
-		name:    cwdPath,
-		size:    emptyDirSize,
-		mode:    fs.ModeDir,
-		modTime: unixEpochTime,
-		isDir:   true,
-	}
+	_ File           = (*memFile)(nil)
+	_ FS             = (*memFS)(nil)
+	_ fs.GlobFS      = (*memFS)(nil)
+	_ fs.ReadDirFile = (*memDirFile)(nil)
 )
 
-type memFS struct {
-	mu   sync.RWMutex
-	name string
-	dir  memNodeMap
-}
-
+// memNode holds the stored state for one file or directory.
 type memNode struct {
-	name    string
+	name    string // base name (path.Base of the full path key)
 	content []byte
 	mode    fs.FileMode
 	modTime time.Time
+	isDir   bool
 }
 
 func (n *memNode) size() int64 {
-	if n.mode.IsDir() {
+	if n.isDir {
 		return emptyDirSize
 	}
 	return int64(len(n.content))
 }
 
-type memNodeMap map[string]*memNode
+func (n *memNode) info() fs.FileInfo {
+	return &fsInfo{
+		name:    n.name,
+		size:    n.size(),
+		mode:    n.mode,
+		modTime: n.modTime,
+		isDir:   n.isDir,
+	}
+}
 
+// memFS is an in-memory file system. All nodes are stored in a flat map keyed
+// by their clean path without trailing slashes (e.g. "." for root, "a/b" for a
+// nested file or directory).
+type memFS struct {
+	mu    sync.RWMutex
+	name  string
+	nodes map[string]*memNode
+}
+
+// memFile is an open read-write handle for a regular file. Writes are
+// immediately synced back to the filesystem node so that subsequent Open calls
+// observe the latest content.
 type memFile struct {
-	name      string
-	content   []byte
-	offset    int64
-	mode      fs.FileMode
-	modTime   time.Time
-	mu        sync.Mutex
-	fsys      *memFS
-	dirOffset int
+	mu      sync.Mutex
+	fsys    *memFS
+	path    string
+	content []byte
+	offset  int64
+	mode    fs.FileMode
+	modTime time.Time
 }
 
 func (f *memFile) Stat() (fs.FileInfo, error) {
-	size := int64(len(f.content))
-	if f.mode.IsDir() {
-		size = int64(emptyDirSize)
-	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	return &fsInfo{
-		name:    path.Base(f.name),
-		size:    size,
+		name:    path.Base(f.path),
+		size:    int64(len(f.content)),
 		mode:    f.mode,
 		modTime: f.modTime,
-		isDir:   f.mode.IsDir(),
-		sys:     nil,
+		isDir:   false,
 	}, nil
 }
 
 func (f *memFile) Read(p []byte) (int, error) {
-	if f.mode.IsDir() {
-		return 0, &fs.PathError{Op: "read", Path: f.name, Err: errors.New("is a directory")}
-	}
-	if len(f.content) == 0 {
-		return 0, io.EOF
-	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.offset >= int64(len(f.content)) {
 		return 0, io.EOF
 	}
@@ -108,6 +110,8 @@ func (f *memFile) Read(p []byte) (int, error) {
 }
 
 func (f *memFile) ReadAt(p []byte, off int64) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if off >= int64(len(f.content)) {
 		return 0, io.EOF
 	}
@@ -127,14 +131,14 @@ func (f *memFile) WriteString(s string) (int, error) {
 	defer f.mu.Unlock()
 
 	f.content = append(f.content, s...)
-	f.modTime = time.Now()
+	now := time.Now()
+	f.modTime = now
 
-	// Sync back to the filesystem
-	if f.fsys != nil && !f.mode.IsDir() {
+	if f.fsys != nil {
 		f.fsys.mu.Lock()
-		if e, ok := f.fsys.dir[f.name]; ok {
-			e.content = bytes.Clone(f.content)
-			e.modTime = f.modTime
+		if node, ok := f.fsys.nodes[f.path]; ok {
+			node.content = bytes.Clone(f.content)
+			node.modTime = now
 		}
 		f.fsys.mu.Unlock()
 	}
@@ -143,20 +147,23 @@ func (f *memFile) WriteString(s string) (int, error) {
 }
 
 func (f *memFile) Seek(offset int64, whence int) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var newOffset int64
 	switch whence {
 	case io.SeekStart:
-		f.offset = offset
+		newOffset = offset
 	case io.SeekCurrent:
-		f.offset += offset
+		newOffset = f.offset + offset
 	case io.SeekEnd:
-		f.offset = int64(len(f.content)) + offset
+		newOffset = int64(len(f.content)) + offset
 	default:
 		return 0, errors.New("invalid whence")
 	}
-	if f.offset < 0 {
-		f.offset = 0
+	if newOffset < 0 {
 		return 0, errors.New("negative offset")
 	}
+	f.offset = newOffset
 	return f.offset, nil
 }
 
@@ -164,97 +171,51 @@ func (f *memFile) Close() error {
 	return nil
 }
 
-func (f *memFile) Readdir(n int) ([]fs.FileInfo, error) {
-	if !f.mode.IsDir() {
-		return nil, pathError("readdir", f.name, fs.ErrInvalid)
-	}
-	if f.fsys == nil {
-		return nil, pathError("readdir", f.name, fs.ErrInvalid)
-	}
-
-	fsys := f.fsys
-	fsys.mu.RLock()
-	defer fsys.mu.RUnlock()
-
-	prefix := ""
-	if f.name != cwdPath {
-		prefix = f.name
-		if !strings.HasSuffix(prefix, "/") {
-			prefix = prefix + "/"
-		}
-	}
-
-	// Collect all unique child names
-	seen := make(map[string]bool)
-	var childNames []string
-	for key := range fsys.dir {
-		if key == cwdPath {
-			continue
-		}
-		if remainder, ok := strings.CutPrefix(key, prefix); ok {
-			childName, _, _ := strings.Cut(remainder, "/")
-			if childName != "" && !seen[childName] {
-				seen[childName] = true
-				childNames = append(childNames, childName)
-			}
-		}
-	}
-	sort.Strings(childNames)
-
-	// Build file info for each child
-	all := make([]fs.FileInfo, 0, len(childNames))
-	for _, childName := range childNames {
-		e := fsys.dir[prefix+childName]
-		if e == nil {
-			e = fsys.dir[prefix+childName+"/"]
-		}
-		if e != nil {
-			all = append(all, &fsInfo{
-				name:    e.name,
-				size:    e.size(),
-				mode:    e.mode,
-				modTime: e.modTime,
-				isDir:   e.mode.IsDir(),
-				sys:     nil,
-			})
-		}
-	}
-
-	// Handle exhaustion
-	if f.dirOffset >= len(all) {
-		if n > 0 {
-			return nil, io.EOF
-		}
-		return nil, nil
-	}
-
-	// Determine how many entries to return
-	if n > 0 {
-		end := min(f.dirOffset+n, len(all))
-		batch := all[f.dirOffset:end]
-		f.dirOffset = end
-		return batch, nil
-	}
-
-	// n <= 0: return all remaining
-	batch := all[f.dirOffset:]
-	f.dirOffset = len(all)
-	return batch, nil
+// memDirFile is an open directory handle. It snapshots the directory entries at
+// Open time so that paginated ReadDir calls are stable even if the filesystem is
+// modified concurrently.
+type memDirFile struct {
+	path    string
+	entries []fs.DirEntry
+	offset  int
+	mode    fs.FileMode
+	modTime time.Time
 }
 
-func (f *memFile) ReadDir(n int) ([]fs.DirEntry, error) {
-	if !f.mode.IsDir() {
-		return nil, pathError("readdirent", f.name, fs.ErrInvalid)
+func (d *memDirFile) Stat() (fs.FileInfo, error) {
+	return &fsInfo{
+		name:    path.Base(d.path),
+		size:    emptyDirSize,
+		mode:    d.mode,
+		modTime: d.modTime,
+		isDir:   true,
+	}, nil
+}
+
+func (d *memDirFile) Read([]byte) (int, error) {
+	return 0, &fs.PathError{Op: "read", Path: d.path, Err: fmt.Errorf("is a directory")}
+}
+
+func (d *memDirFile) Close() error {
+	return nil
+}
+
+func (d *memDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
+	if n <= 0 {
+		batch := d.entries[d.offset:]
+		d.offset = len(d.entries)
+		return batch, nil
 	}
-	infos, err := f.Readdir(n)
-	if err != nil {
-		return nil, err
+	if d.offset >= len(d.entries) {
+		return nil, io.EOF
 	}
-	entries := make([]fs.DirEntry, 0, len(infos))
-	for _, info := range infos {
-		entries = append(entries, fs.FileInfoToDirEntry(info))
+	end := d.offset + n
+	if end > len(d.entries) {
+		end = len(d.entries)
 	}
-	return entries, nil
+	batch := d.entries[d.offset:end]
+	d.offset = end
+	return batch, nil
 }
 
 func (fsys *memFS) String() string {
@@ -263,59 +224,104 @@ func (fsys *memFS) String() string {
 
 func (fsys *memFS) isClosed() bool {
 	fsys.mu.RLock()
-	closed := fsys.dir == nil
+	closed := fsys.nodes == nil
 	fsys.mu.RUnlock()
 	return closed
 }
 
 func (fsys *memFS) Open(name string) (fs.File, error) {
-	return fsys.open(name, "open")
-}
-
-func (fsys *memFS) open(name string, op string) (fs.File, error) {
 	if fsys.isClosed() {
-		return nil, fs.ErrClosed
+		return nil, pathError("open", name, fs.ErrClosed)
 	}
-	// Handle root directory
 	if name == cwdPath {
-		return &memFile{
-			name:    cwdPath,
-			content: nil,
-			mode:    fs.ModeDir,
-			modTime: time.Now(),
-			fsys:    fsys,
-		}, nil
+		return fsys.openDir(cwdPath)
 	}
-	if err := validPath(op, name); err != nil {
+	if err := validPath("open", name); err != nil {
 		return nil, err
 	}
-	fsys.mu.RLock()
-	defer fsys.mu.RUnlock()
 
-	e, err := fsys.findEnt(name)
+	fsys.mu.RLock()
+	node, ok := fsys.nodes[name]
+	fsys.mu.RUnlock()
+
+	if !ok {
+		return nil, pathError("open", name, fs.ErrNotExist)
+	}
+	if node.isDir {
+		return fsys.openDir(name)
+	}
+	return &memFile{
+		fsys:    fsys,
+		path:    name,
+		content: bytes.Clone(node.content),
+		mode:    node.mode,
+		modTime: node.modTime,
+	}, nil
+}
+
+func (fsys *memFS) openDir(name string) (*memDirFile, error) {
+	entries, err := fsys.listDir(name)
 	if err != nil {
 		return nil, err
 	}
-	content := bytes.Clone(e.content)
-	return &memFile{
-		name:    name,
-		content: content,
-		mode:    e.mode,
-		modTime: e.modTime,
-		fsys:    fsys,
+	var mode fs.FileMode = fs.ModeDir | fs.ModePerm
+	var modTime time.Time
+	fsys.mu.RLock()
+	if node, ok := fsys.nodes[name]; ok {
+		mode = node.mode
+		modTime = node.modTime
+	}
+	fsys.mu.RUnlock()
+	return &memDirFile{
+		path:    name,
+		entries: entries,
+		mode:    mode,
+		modTime: modTime,
 	}, nil
+}
+
+// listDir returns a sorted snapshot of the immediate children of dir.
+func (fsys *memFS) listDir(dir string) ([]fs.DirEntry, error) {
+	fsys.mu.RLock()
+	defer fsys.mu.RUnlock()
+
+	prefix := dir + "/"
+	if dir == cwdPath {
+		prefix = ""
+	}
+
+	var entries []fs.DirEntry
+	seen := make(map[string]struct{})
+	for key, node := range fsys.nodes {
+		if key == cwdPath {
+			continue
+		}
+		rest, ok := strings.CutPrefix(key, prefix)
+		if !ok || strings.Contains(rest, "/") {
+			continue
+		}
+		if _, exists := seen[rest]; exists {
+			continue
+		}
+		seen[rest] = struct{}{}
+		entries = append(entries, fs.FileInfoToDirEntry(node.info()))
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+	return entries, nil
 }
 
 func (fsys *memFS) Close() error {
 	fsys.mu.Lock()
-	fsys.dir = nil
+	fsys.nodes = nil
 	fsys.mu.Unlock()
 	return nil
 }
 
 func (fsys *memFS) Create(name string) (File, error) {
 	if fsys.isClosed() {
-		return nil, fs.ErrClosed
+		return nil, pathError("create", name, fs.ErrClosed)
 	}
 	if err := validPath("create", name); err != nil {
 		return nil, err
@@ -324,29 +330,25 @@ func (fsys *memFS) Create(name string) (File, error) {
 	defer fsys.mu.Unlock()
 
 	now := time.Now()
-	fsys.dir[name] = &memNode{
+	node := &memNode{
 		name:    path.Base(name),
-		content: nil,
 		mode:    fs.ModePerm,
 		modTime: now,
 	}
-	// Ensure parent dirs exist
-	parent := path.Dir(name)
-	if parent != cwdPath {
-		fsys.ensureParent(parent, now)
-	}
+	fsys.nodes[name] = node
+	fsys.ensureParentsLocked(name, now)
+
 	return &memFile{
-		name:    name,
-		content: nil,
-		mode:    fs.ModePerm,
-		modTime: now,
 		fsys:    fsys,
+		path:    name,
+		mode:    node.mode,
+		modTime: node.modTime,
 	}, nil
 }
 
 func (fsys *memFS) MkdirAll(name string, perm fs.FileMode) error {
 	if fsys.isClosed() {
-		return fs.ErrClosed
+		return pathError("mkdir", name, fs.ErrClosed)
 	}
 	if err := validPath("mkdir", name); err != nil {
 		return err
@@ -354,150 +356,153 @@ func (fsys *memFS) MkdirAll(name string, perm fs.FileMode) error {
 	fsys.mu.Lock()
 	defer fsys.mu.Unlock()
 
-	full := name
-	if !strings.HasSuffix(full, "/") {
-		full = full + "/"
-	}
-	parts := strings.Split(strings.Trim(full, "/"), "/")
-	accum := ""
 	now := time.Now()
-	for _, part := range parts {
+	parts := splitPath(name)
+	accum := ""
+	for i, part := range parts {
 		if part == "" {
 			continue
 		}
-		accum += part + "/"
-		if _, ok := fsys.dir[accum]; !ok {
-			fsys.dir[accum] = &memNode{
+		if i > 0 {
+			accum += "/"
+		}
+		accum += part
+		if _, ok := fsys.nodes[accum]; !ok {
+			fsys.nodes[accum] = &memNode{
 				name:    part,
-				content: nil,
 				mode:    fs.ModeDir | perm,
 				modTime: now,
+				isDir:   true,
 			}
 		}
 	}
 	return nil
 }
 
-func (fsys *memFS) findEnt(name string) (*memNode, error) {
-	e, ok := fsys.dir[name]
-	if ok {
-		return e, nil
+// ensureParentsLocked creates any missing ancestor directories for the given
+// path. Must be called with fsys.mu held for writing.
+func (fsys *memFS) ensureParentsLocked(name string, now time.Time) {
+	dir := path.Dir(name)
+	if dir == cwdPath {
+		return
 	}
-	// Try with trailing slash for directories
-	slashName := name + "/"
-	e, ok = fsys.dir[slashName]
-	if ok {
-		return e, nil
-	}
-	return nil, pathError("open", name, fs.ErrNotExist)
-}
-
-func (fsys *memFS) ensureParent(dir string, now time.Time) {
-	full := dir
-	if !strings.HasSuffix(full, "/") {
-		full = full + "/"
-	}
-	parts := strings.Split(strings.Trim(full, "/"), "/")
+	parts := splitPath(dir)
 	accum := ""
-	for _, part := range parts {
+	for i, part := range parts {
 		if part == "" {
 			continue
 		}
-		accum += part + "/"
-		if _, ok := fsys.dir[accum]; !ok {
-			fsys.dir[accum] = &memNode{
+		if i > 0 {
+			accum += "/"
+		}
+		accum += part
+		if _, ok := fsys.nodes[accum]; !ok {
+			fsys.nodes[accum] = &memNode{
 				name:    part,
-				content: nil,
 				mode:    fs.ModeDir | fs.ModePerm,
 				modTime: now,
+				isDir:   true,
 			}
 		}
 	}
 }
+
 func (fsys *memFS) ReadFile(name string) ([]byte, error) {
+	if fsys.isClosed() {
+		return nil, pathError("readfile", name, fs.ErrClosed)
+	}
 	if err := validPath("readfile", name); err != nil {
 		return nil, err
 	}
 	fsys.mu.RLock()
 	defer fsys.mu.RUnlock()
-	e, err := fsys.findEnt(name)
-	if err != nil {
-		return nil, err
+	node, ok := fsys.nodes[name]
+	if !ok {
+		return nil, pathError("readfile", name, fs.ErrNotExist)
 	}
-	return bytes.Clone(e.content), nil
+	return bytes.Clone(node.content), nil
 }
 
 func (fsys *memFS) ReadLink(name string) (string, error) {
+	if fsys.isClosed() {
+		return "", pathError("readlink", name, fs.ErrClosed)
+	}
 	if err := validPath("readlink", name); err != nil {
 		return "", err
 	}
 	fsys.mu.RLock()
 	defer fsys.mu.RUnlock()
-	if _, err := fsys.findEnt(name); err != nil {
-		return "", err
+	if _, ok := fsys.nodes[name]; !ok {
+		return "", pathError("readlink", name, fs.ErrNotExist)
 	}
 	// memFS has no symlinks; every extant path is a regular file or directory.
 	return "", pathError("readlink", name, fs.ErrInvalid)
 }
 
 func (fsys *memFS) Stat(name string) (fs.FileInfo, error) {
-	// Root directory is never stored in the map.
+	if fsys.isClosed() {
+		return nil, pathError("stat", name, fs.ErrClosed)
+	}
 	if name == cwdPath {
-		return memFSCwdInfo, nil
+		fsys.mu.RLock()
+		node := fsys.nodes[cwdPath]
+		fsys.mu.RUnlock()
+		return node.info(), nil
 	}
 	if err := validPath("stat", name); err != nil {
 		return nil, err
 	}
 	fsys.mu.RLock()
 	defer fsys.mu.RUnlock()
-	e, err := fsys.findEnt(name)
-	if err != nil {
-		return nil, err
+	node, ok := fsys.nodes[name]
+	if !ok {
+		return nil, pathError("stat", name, fs.ErrNotExist)
 	}
-
-	return &fsInfo{
-		name:    e.name,
-		size:    e.size(),
-		mode:    e.mode,
-		modTime: e.modTime,
-		isDir:   e.mode.IsDir(),
-	}, nil
+	return node.info(), nil
 }
 
 func (fsys *memFS) Lstat(name string) (fs.FileInfo, error) {
-	// Root directory is never stored in the map.
+	if fsys.isClosed() {
+		return nil, pathError("lstat", name, fs.ErrClosed)
+	}
 	if name == cwdPath {
-		return memFSCwdInfo, nil
+		fsys.mu.RLock()
+		node := fsys.nodes[cwdPath]
+		fsys.mu.RUnlock()
+		return node.info(), nil
 	}
 	if err := validPath("lstat", name); err != nil {
 		return nil, err
 	}
 	fsys.mu.RLock()
 	defer fsys.mu.RUnlock()
-	e, err := fsys.findEnt(name)
-	if err != nil {
-		return nil, err
+	node, ok := fsys.nodes[name]
+	if !ok {
+		return nil, pathError("lstat", name, fs.ErrNotExist)
 	}
-	return &fsInfo{
-		name:    e.name,
-		size:    e.size(),
-		mode:    e.mode,
-		modTime: e.modTime,
-		isDir:   e.mode.IsDir(),
-	}, nil
+	return node.info(), nil
 }
 
 func (fsys *memFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	f, err := fsys.open(name, "readdir")
-	if err != nil {
+	if fsys.isClosed() {
+		return nil, pathError("readdir", name, fs.ErrClosed)
+	}
+	if name == cwdPath {
+		return fsys.listDir(cwdPath)
+	}
+	if err := validPath("readdir", name); err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	mf := f.(*memFile)
-	if !mf.mode.IsDir() {
+	fsys.mu.RLock()
+	node, ok := fsys.nodes[name]
+	fsys.mu.RUnlock()
+	if !ok {
+		return nil, pathError("readdir", name, fs.ErrNotExist)
+	}
+	if !node.isDir {
 		return nil, pathError("readdir", name, fs.ErrInvalid)
 	}
-	return mf.ReadDir(-1)
+	return fsys.listDir(name)
 }
 
 func (fsys *memFS) Glob(pattern string) ([]string, error) {
@@ -507,20 +512,17 @@ func (fsys *memFS) Glob(pattern string) ([]string, error) {
 	fsys.mu.RLock()
 	defer fsys.mu.RUnlock()
 
-	seen := make(map[string]bool)
 	var matches []string
-	for key := range fsys.dir {
-		name := strings.TrimSuffix(key, "/")
-		if seen[name] {
+	for key := range fsys.nodes {
+		if key == cwdPath {
 			continue
 		}
-		matched, err := path.Match(pattern, name)
+		matched, err := path.Match(pattern, key)
 		if err != nil {
 			return nil, err
 		}
 		if matched {
-			seen[name] = true
-			matches = append(matches, name)
+			matches = append(matches, key)
 		}
 	}
 	sort.Strings(matches)
@@ -532,9 +534,17 @@ func newMemFS(name string) (FS, error) {
 }
 
 func makeMemFS(name string) *memFS {
+	now := time.Now()
 	return &memFS{
 		name: name,
-		dir:  memNodeMap{},
+		nodes: map[string]*memNode{
+			cwdPath: {
+				name:    cwdPath,
+				mode:    fs.ModeDir | fs.ModePerm,
+				modTime: now,
+				isDir:   true,
+			},
+		},
 	}
 }
 
