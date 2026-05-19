@@ -20,7 +20,12 @@ import (
 	"path"
 )
 
-// Rsync copies a directory structure of the source file system to the destination file system.
+// Rsync copies all files under dir from srcFS into destFS, preserving the
+// relative path structure. Parent directories in destFS are created with
+// [fs.ModePerm] as needed. Existing files in destFS are overwritten. The copy
+// is not atomic: if an error occurs mid-walk, destFS may be partially written.
+//
+// dir must satisfy [fs.ValidPath]; use "." to copy the entire file system.
 func Rsync(srcFS fs.FS, destFS FS, dir string) error {
 	// TODO: Prevent archive traversal.
 	return ForEachFilename(srcFS, dir, func(name string) error {
@@ -36,7 +41,9 @@ func Rsync(srcFS fs.FS, destFS FS, dir string) error {
 	})
 }
 
-// Copy a file from one file system to another.
+// Copy copies the single file at srcFilename in srcFS to destFilename in destFS.
+// The parent directory of destFilename must already exist. The destination file
+// is created (or truncated) via [FS.Create].
 func Copy(srcFS fs.FS, srcFilename string, destFS FS, destFilename string) error {
 	sfp, err := srcFS.Open(srcFilename)
 	if err != nil {
@@ -56,8 +63,11 @@ func Copy(srcFS fs.FS, srcFilename string, destFS FS, destFilename string) error
 	return nil
 }
 
-// ForEachFilename is similar to ListFiles but calls against an object.
-// Using this over ListFiles will save memory for large file listings.
+// ForEachFilename calls f for each file path (not directory) under dir,
+// streaming results without building an intermediate slice. If fsys implements
+// [ForEachFilenameIter], its native implementation is used directly; otherwise
+// the paths are collected via [ListFiles] and iterated. f receives paths
+// relative to dir. The walk stops and returns the first non-nil error from f.
 func ForEachFilename(fsys fs.FS, dir string, f func(string) error) error {
 	lf, ok := fsys.(ForEachFilenameIter)
 	if ok {
@@ -75,8 +85,10 @@ func ForEachFilename(fsys fs.FS, dir string, f func(string) error) error {
 	return nil
 }
 
-// ForEachFileInfo is similar to ListFiles but calls against an object.
-// Using this over ListFiles will save memory for large file listings.
+// ForEachFileInfo calls f for each file (not directory) under dir, providing
+// its [fs.FileInfo]. It is the typed companion to [ForEachFilename] and prefers
+// a native [ForEachFileInfoIter] implementation when available, falling back to
+// [fs.WalkDir]. The walk stops and returns the first non-nil error from f.
 func ForEachFileInfo(fsys fs.FS, dir string, f func(fs.FileInfo) error) error {
 	lf, ok := fsys.(ForEachFileInfoIter)
 	if ok {
@@ -100,12 +112,16 @@ func ForEachFileInfo(fsys fs.FS, dir string, f func(fs.FileInfo) error) error {
 	})
 }
 
-// List directories and files.
+// List returns all paths (both files and directories) under dir in lexical
+// order. The root directory "." is never included in the result. For
+// files-only, prefer [ListFiles].
 func List(fsys fs.FS, dir string) ([]string, error) {
 	return list(fsys, dir, true)
 }
 
-// ListFiles is similar to list but excludes directories.
+// ListFiles returns the paths of all files (excluding directories) under dir in
+// lexical order. If fsys implements [ListFilenames], its native implementation
+// is used to avoid building intermediate [fs.FileInfo] values.
 func ListFiles(fsys fs.FS, dir string) ([]string, error) {
 	lf, ok := fsys.(ListFilenames)
 	if ok {
