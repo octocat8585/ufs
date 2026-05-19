@@ -23,7 +23,19 @@ import (
 	"strings"
 )
 
-// CreateURI creates a URI that specifies the configuration for how to construct the file system with nested mount points.
+// CreateURI constructs a URI understood by [New] that layers additional file
+// systems at specific mount paths inside the base file system. The nested map
+// maps mount-point paths (e.g. "cache", "data/scratch") to the URI of the file
+// system to mount there. Paths follow [fs.ValidPath] conventions.
+//
+// Pass the returned URI directly to [New]:
+//
+//	uri, _ := ufs.CreateURI("file:///srv/data", map[string]string{
+//	    "tmp": "memory://",
+//	})
+//	fsys, _ := ufs.New(uri)
+//
+// Returns an error if name or any nested URI cannot be parsed.
 func CreateURI(name string, nested map[string]string) (string, error) {
 	u, err := nameToURI(name)
 	if err != nil {
@@ -54,7 +66,42 @@ func nameToURI(name string) (*url.URL, error) {
 	return u, nil
 }
 
-// New creates a new nested file system. Use CreateURI to construct the string.
+// New opens a file system identified by name. The returned [FS] wraps the
+// backend in a nestFS layer that automatically mounts archives found inside the
+// tree (see below). Always call Close on the returned FS when done.
+//
+// # URI schemes
+//
+//   - memory://   — volatile in-memory file system; all data is lost when the
+//     FS is closed or the process exits. Safe for concurrent use.
+//   - null://     — /dev/null semantics: Create and MkdirAll always succeed,
+//     writes are accepted but discarded, reads return empty content, Stat
+//     reports everything as a directory. Useful in tests.
+//   - angry://    — always returns [fs.ErrInvalid]; used to exercise
+//     error-handling paths in tests.
+//   - file://path  or a bare path — local directory, mounted read-write via
+//     [os.OpenRoot] (Go 1.24+). Access outside the mount root is rejected by
+//     the OS. On Windows, directory Stat always reports size 0 (unlike the raw
+//     os package which may report 4096).
+//   - gs://bucket/prefix — Google Cloud Storage bucket, optionally scoped to a
+//     prefix. Credentials are resolved via ADC; unauthenticated access is tried
+//     as a fallback.
+//   - https:// or http:// URL ending in a recognised archive extension — the
+//     archive is downloaded to a temporary directory, mounted read-only, and the
+//     temporary directory is removed when Close is called.
+//   - A path ending in .git — the repository is shallow-cloned into a temporary
+//     directory (not available on AIX).
+//   - A local path pointing to a recognised archive (.zip, .tar, .tar.gz, etc.)
+//     is mounted read-only through the archive's contents.
+//
+// # Nested mounts and archive auto-mounting
+//
+// The returned FS wraps all backends in a nestFS layer. When a directory entry
+// named foo.zip (or any recognised archive extension) exists, the virtual path
+// foo.zip.d is automatically exposed as a read-only mount of that archive's
+// contents. No explicit configuration is required.
+//
+// Use [CreateURI] to pre-configure additional mount points before calling New.
 func New(name string) (FS, error) {
 	u, err := url.Parse(name)
 	if err == nil {
