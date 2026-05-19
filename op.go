@@ -18,7 +18,6 @@ import (
 	"io"
 	"io/fs"
 	"path"
-	"sort"
 )
 
 // Rsync copies a directory structure of the source file system to the destination file system.
@@ -83,20 +82,22 @@ func ForEachFileInfo(fsys fs.FS, dir string, f func(fs.FileInfo) error) error {
 	if ok {
 		return lf.ForEachFileInfo(dir, f)
 	}
-	files, err := ListFiles(fsys, dir)
-	if err != nil {
-		return err
-	}
-	for _, filename := range files {
-		fileInfo, err := fs.Stat(fsys, filename)
+	return fs.WalkDir(fsys, dir, func(p string, d fs.DirEntry, err error) error {
+		if isCwd(p) {
+			return nil
+		}
 		if err != nil {
 			return err
 		}
-		if err := f(fileInfo); err != nil {
+		if d.IsDir() {
+			return nil
+		}
+		info, err := fs.Stat(fsys, p)
+		if err != nil {
 			return err
 		}
-	}
-	return nil
+		return f(info)
+	})
 }
 
 // List directories and files.
@@ -114,28 +115,20 @@ func ListFiles(fsys fs.FS, dir string) ([]string, error) {
 }
 
 func list(fsys fs.FS, dir string, includeDirs bool) ([]string, error) {
-	m := map[string]any{}
-	err := fs.WalkDir(fsys, dir, func(path string, d fs.DirEntry, err error) error {
-		if isCwd(path) && (d == nil || err != nil) {
-			return nil
+	// WalkDir visits each path exactly once in lexical order, so no dedup map
+	// or sort is needed.
+	var items []string
+	err := fs.WalkDir(fsys, dir, func(p string, d fs.DirEntry, err error) error {
+		if isCwd(p) {
+			return nil // never include "." itself; also tolerates missing root
 		}
 		if err != nil {
 			return err
 		}
-		if (includeDirs || !d.IsDir()) && !isCwd(path) {
-			m[path] = nil
+		if includeDirs || !d.IsDir() {
+			items = append(items, p)
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	items := make([]string, len(m))
-	i := 0
-	for k := range m {
-		items[i] = k
-		i++
-	}
-	sort.Strings(items)
-	return items, nil
+	return items, err
 }
