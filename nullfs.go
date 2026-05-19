@@ -15,9 +15,10 @@
 package ufs
 
 import (
-	"fmt"
+	"errors"
 	"io"
 	"io/fs"
+	"path"
 	"strings"
 )
 
@@ -32,7 +33,7 @@ var (
 	_ fs.ReadDirFile = (*nullReadDirFile)(nil)
 
 	nullDirStat = &fsInfo{
-		name:    "",
+		name:    ".",
 		size:    emptyDirSize,
 		mode:    fs.ModeDir | fs.ModePerm,
 		modTime: unixEpochTime,
@@ -54,7 +55,7 @@ func (n *nullFile) Stat() (fs.FileInfo, error) {
 		size = emptyDirSize
 	}
 	return &fsInfo{
-		name:    n.name,
+		name:    path.Base(n.name),
 		size:    size,
 		mode:    mode,
 		modTime: unixEpochTime,
@@ -101,7 +102,7 @@ func (vrd *nullReadDirFile) Stat() (fs.FileInfo, error) {
 }
 
 func (vrd *nullReadDirFile) Read(p []byte) (int, error) {
-	return 0, fmt.Errorf("read '': is a directory")
+	return 0, &fs.PathError{Op: "read", Path: ".", Err: errors.New("is a directory")}
 }
 
 func (vrd *nullReadDirFile) Close() error {

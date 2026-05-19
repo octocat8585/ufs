@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"errors"
 	"io/fs"
 	"strings"
 	"testing"
@@ -125,6 +126,11 @@ func TestReadDirFile(t *testing.T) {
 
 	if bytesRead, err := dirFile.Read(nil); bytesRead != 0 || err == nil || !strings.Contains(err.Error(), "is a directory") {
 		t.Errorf("Read() should return (0, 'is a directory') got (%d, %s)", bytesRead, err)
+	} else {
+		var pe *fs.PathError
+		if !errors.As(err, &pe) {
+			t.Errorf("Read() error type = %T, want *fs.PathError; err = %v", err, err)
+		}
 	}
 
 	entries, err := dirFile.ReadDir(-1)

@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"errors"
 	"io"
 	"io/fs"
 	"testing"
@@ -311,4 +312,39 @@ func TestNullFileOperations(t *testing.T) {
 
 func mustNullFS(tb testing.TB) *nullFS {
 	return makeNullFS(nullFSPrefix)
+}
+
+func TestNullFileStatBaseName(t *testing.T) {
+	// FileInfo.Name() must return path.Base(name), not the full path.
+	f := newNullFile("dir/subdir/file.txt")
+	info, err := f.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Name() != "file.txt" {
+		t.Errorf("Stat().Name() = %q, want %q (base name only)", info.Name(), "file.txt")
+	}
+}
+
+func TestNullDirStatName(t *testing.T) {
+	// Root dir FileInfo.Name() must return "." per fs.FS convention.
+	if nullDirStat.Name() != "." {
+		t.Errorf("nullDirStat.Name() = %q, want %q", nullDirStat.Name(), ".")
+	}
+}
+
+func TestNullReadDirFileReadReturnsPathError(t *testing.T) {
+	// Reading from a directory must return *fs.PathError, not a plain error.
+	f := &nullReadDirFile{}
+	n, err := f.Read(make([]byte, 1))
+	if err == nil {
+		t.Fatal("Read() on directory returned nil error, want *fs.PathError")
+	}
+	if n != 0 {
+		t.Errorf("Read() = %d bytes, want 0", n)
+	}
+	var pe *fs.PathError
+	if !errors.As(err, &pe) {
+		t.Errorf("Read() error type = %T, want *fs.PathError; err = %v", err, err)
+	}
 }

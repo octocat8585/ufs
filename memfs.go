@@ -93,6 +93,9 @@ func (f *memFile) Stat() (fs.FileInfo, error) {
 }
 
 func (f *memFile) Read(p []byte) (int, error) {
+	if f.mode.IsDir() {
+		return 0, &fs.PathError{Op: "read", Path: f.name, Err: errors.New("is a directory")}
+	}
 	if len(f.content) == 0 {
 		return 0, io.EOF
 	}
@@ -442,7 +445,7 @@ func (fsys *memFS) Stat(name string) (fs.FileInfo, error) {
 	if name == cwdPath {
 		return memFSCwdInfo, nil
 	}
-	if err := validPath("lstat", name); err != nil {
+	if err := validPath("stat", name); err != nil {
 		return nil, err
 	}
 	fsys.mu.RLock()
