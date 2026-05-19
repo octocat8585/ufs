@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"errors"
 	"io"
 	"io/fs"
 	"testing"
@@ -696,5 +697,55 @@ func TestMemFSMkdirAllInvalid(t *testing.T) {
 	}
 	if err := fsys.MkdirAll("invalid/../path", fs.ModePerm); err == nil {
 		t.Error("MkdirAll(invalid/../path) succeeded, want error")
+	}
+}
+
+func TestMemFileDirRead(t *testing.T) {
+	// Read() on a directory must return a non-EOF error.
+	// Returning io.EOF is wrong: io.ReadAll would silently succeed with empty
+	// content instead of propagating an error to the caller.
+	fsys, err := newMemFS("memory://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.MkdirAll("emptydir", fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, dirPath := range []string{".", "emptydir"} {
+		t.Run(dirPath, func(t *testing.T) {
+			f, err := fsys.Open(dirPath)
+			if err != nil {
+				t.Fatalf("Open(%q) = %v", dirPath, err)
+			}
+			defer f.Close()
+
+			n, err := f.Read(make([]byte, 1))
+			if err == nil || err == io.EOF {
+				t.Errorf("Read() on directory %q = (%d, %v), want a non-EOF error", dirPath, n, err)
+			}
+			if n != 0 {
+				t.Errorf("Read() on directory %q returned %d bytes, want 0", dirPath, n)
+			}
+		})
+	}
+}
+
+func TestMemFSStatOpName(t *testing.T) {
+	// Stat() for an invalid path must report Op = "stat", not "lstat".
+	fsys, err := newMemFS("memory://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = fsys.Stat("/absolute")
+	if err == nil {
+		t.Fatal("Stat(/absolute) succeeded, want error")
+	}
+	var pe *fs.PathError
+	if !errors.As(err, &pe) {
+		t.Fatalf("Stat() error type = %T, want *fs.PathError", err)
+	}
+	if pe.Op != "stat" {
+		t.Errorf("Stat() PathError.Op = %q, want %q", pe.Op, "stat")
 	}
 }
