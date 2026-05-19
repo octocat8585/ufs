@@ -308,19 +308,15 @@ func TestMemFSDirectory(t *testing.T) {
 		t.Error("IsDir() = false, want true")
 	}
 
-	// Readdir on file should fail
+	// Regular files must not implement fs.ReadDirFile.
 	f, err := fsys.Create("subdir/file.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer f.Close()
 
-	if mf, ok := f.(*memFile); ok {
-		if _, err := mf.Readdir(1); err == nil {
-			t.Error("Readdir on file succeeded, want error")
-		}
-	} else {
-		t.Fatal("file is not *memFile")
+	if _, ok := f.(fs.ReadDirFile); ok {
+		t.Error("regular file implements fs.ReadDirFile, want it not to")
 	}
 }
 
@@ -614,12 +610,16 @@ func TestMemFSReaddirAll(t *testing.T) {
 	}
 	defer dir.Close()
 
-	entries, err := dir.(*memFile).Readdir(-1)
+	rdf, ok := dir.(fs.ReadDirFile)
+	if !ok {
+		t.Fatal("Open(dir) did not return a fs.ReadDirFile")
+	}
+	entries, err := rdf.ReadDir(-1)
 	if err != nil {
-		t.Fatalf("Readdir(-1) = %v, want nil", err)
+		t.Fatalf("ReadDir(-1) = %v, want nil", err)
 	}
 	if len(entries) != 2 {
-		t.Errorf("Readdir(-1) = %d entries, want 2", len(entries))
+		t.Errorf("ReadDir(-1) = %d entries, want 2", len(entries))
 	}
 }
 
@@ -644,17 +644,20 @@ func TestMemFSReaddirPaginated(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer dir.Close()
-	mf := dir.(*memFile)
 
+	rdf, ok := dir.(fs.ReadDirFile)
+	if !ok {
+		t.Fatal("Open(dir) did not return a fs.ReadDirFile")
+	}
 	for i := range 3 {
-		e, err := mf.Readdir(1)
+		e, err := rdf.ReadDir(1)
 		if err != nil || len(e) != 1 {
-			t.Fatalf("Readdir(1) call %d: got %d entries, err=%v", i+1, len(e), err)
+			t.Fatalf("ReadDir(1) call %d: got %d entries, err=%v", i+1, len(e), err)
 		}
 	}
 	// Exhausted: next call with n>0 must return io.EOF
-	if _, err := mf.Readdir(1); err != io.EOF {
-		t.Errorf("Readdir(1) after exhaustion = %v, want io.EOF", err)
+	if _, err := rdf.ReadDir(1); err != io.EOF {
+		t.Errorf("ReadDir(1) after exhaustion = %v, want io.EOF", err)
 	}
 }
 
@@ -669,7 +672,11 @@ func TestMemFileReadDirOnFile(t *testing.T) {
 	}
 	defer f.Close()
 
-	if _, err := f.(*memFile).ReadDir(0); err == nil {
+	// Regular files must not expose ReadDir; ReadDirFS.ReadDir should error.
+	if _, ok := f.(fs.ReadDirFile); ok {
+		t.Error("regular file implements fs.ReadDirFile, want it not to")
+	}
+	if _, err := fsys.ReadDir("regular.txt"); err == nil {
 		t.Error("ReadDir on a regular file succeeded, want error")
 	}
 }

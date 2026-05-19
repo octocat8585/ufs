@@ -205,4 +205,3 @@ func newLocalFS(name string) (FS, error) {
 func isLocalFSUri(name string) bool {
 	return strings.HasPrefix(name, localFSPrefix) || !strings.Contains(name, "://")
 }
-
