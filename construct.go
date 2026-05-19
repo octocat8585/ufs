@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 )
 
@@ -42,8 +43,13 @@ func CreateURI(name string, nested map[string]string) (string, error) {
 		return "", err
 	}
 	vals := u.Query()
-	for mountPoint, uri := range nested {
-		mu, err := nameToURI(uri)
+	mountPoints := make([]string, 0, len(nested))
+	for mountPoint := range nested {
+		mountPoints = append(mountPoints, mountPoint)
+	}
+	sort.Strings(mountPoints)
+	for _, mountPoint := range mountPoints {
+		mu, err := nameToURI(nested[mountPoint])
 		if err != nil {
 			return "", err
 		}
