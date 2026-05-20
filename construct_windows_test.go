@@ -21,18 +21,27 @@ import (
 	"testing"
 )
 
-// TestNameToURIWindowsDriveLetters verifies that nameToURI correctly converts
-// "file://X:\path" strings (which url.Parse rejects on Windows) into valid
-// file:// URL structs for drive letters other than C:.
+// TestNameToURIWindowsDriveLetters verifies that nameToURI handles both
+// "file://X:\path" strings (which url.Parse rejects) and bare Windows paths
+// ("X:", "X:\") for drive letters other than C:.
 func TestNameToURIWindowsDriveLetters(t *testing.T) {
 	tests := []struct {
-		input    string
-		wantPath string
+		input      string
+		wantScheme string
+		wantPath   string
 	}{
-		{`file://D:\`, `/D:/`},
-		{`file://D:\some\path`, `/D:/some/path`},
-		{`file://Z:\data`, `/Z:/data`},
-		{`file://Z:\deeply\nested\dir`, `/Z:/deeply/nested/dir`},
+		// With file:// prefix — url.Parse fails; our fix recovers these into
+		// a canonical file:/// URL.
+		{`file://D:\`, "file", `/D:/`},
+		{`file://D:\some\path`, "file", `/D:/some/path`},
+		{`file://Z:\data`, "file", `/Z:/data`},
+		{`file://Z:\deeply\nested\dir`, "file", `/Z:/deeply/nested/dir`},
+		// Without file:// prefix — url.Parse handles these as opaque URIs
+		// (scheme = lowercase drive letter, path = "").
+		{`D:`, "d", ""},
+		{`D:\`, "d", ""},
+		{`Z:`, "z", ""},
+		{`Z:\`, "z", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -40,8 +49,8 @@ func TestNameToURIWindowsDriveLetters(t *testing.T) {
 			if err != nil {
 				t.Fatalf("nameToURI(%q) = %v, want nil", tt.input, err)
 			}
-			if u.Scheme != "file" {
-				t.Errorf("scheme = %q, want %q", u.Scheme, "file")
+			if u.Scheme != tt.wantScheme {
+				t.Errorf("scheme = %q, want %q", u.Scheme, tt.wantScheme)
 			}
 			if u.Path != tt.wantPath {
 				t.Errorf("path = %q, want %q", u.Path, tt.wantPath)
@@ -74,23 +83,22 @@ func TestLocalFSNormalizePathWindowsDriveLetters(t *testing.T) {
 }
 
 // TestNewWindowsDriveLetters verifies that New() can mount drives other than C:\
-// using both a bare Windows path ("D:\") and a file://-prefixed URI ("file://D:\").
-// Sub-tests are skipped when the drive is not present on the host.
+// in all supported forms: bare drive ("D:"), drive root ("D:\"), and
+// file://-prefixed ("file://D:\"). Each drive letter is skipped entirely when
+// its root is not present on the host.
 func TestNewWindowsDriveLetters(t *testing.T) {
-	drives := []struct {
-		bare    string
-		fileURI string
-	}{
-		{`D:\`, `file://D:\`},
-		{`Z:\`, `file://Z:\`},
-	}
-	for _, d := range drives {
-		d := d
-		t.Run(d.bare, func(t *testing.T) {
-			if _, err := os.Stat(d.bare); err != nil {
-				t.Skipf("drive %s not available: %v", d.bare, err)
+	for _, letter := range []string{"D", "Z"} {
+		letter := letter
+		t.Run(letter+":", func(t *testing.T) {
+			root := letter + `:\`
+			if _, err := os.Stat(root); err != nil {
+				t.Skipf("drive %s: not available: %v", letter, err)
 			}
-			for _, name := range []string{d.bare, d.fileURI} {
+			for _, name := range []string{
+				letter + `:`,        // D:  — current directory of the drive
+				letter + `:\`,       // D:\ — root of the drive
+				`file://` + letter + `:\`, // file://D:\
+			} {
 				fsys, err := New(name)
 				if err != nil {
 					t.Errorf("New(%q) = %v, want nil", name, err)
