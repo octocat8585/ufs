@@ -136,6 +136,20 @@ func TestNullFSLstat(t *testing.T) {
 			t.Fatal("Lstat() returned nil info")
 		}
 	})
+
+	t.Run("cwd", func(t *testing.T) {
+		// cwdPath (".") satisfies isDirName, so mode and size should reflect a directory.
+		info, err := nfs.Lstat(cwdPath)
+		if err != nil {
+			t.Fatalf("Lstat(%q) = %v, want nil", cwdPath, err)
+		}
+		if !info.IsDir() {
+			t.Errorf("Lstat(%q).IsDir() = false, want true", cwdPath)
+		}
+		if info.Mode()&fs.ModeDir == 0 {
+			t.Errorf("Lstat(%q).Mode() missing ModeDir: %v", cwdPath, info.Mode())
+		}
+	})
 }
 
 func TestNullFSReadDir(t *testing.T) {
@@ -307,6 +321,27 @@ func TestNullFileOperations(t *testing.T) {
 	}
 	if info.Mode() != fs.ModePerm {
 		t.Errorf("Mode() = %v, want %v", info.Mode(), fs.ModePerm)
+	}
+}
+
+func TestNullFSStat(t *testing.T) {
+	nfs := mustNullFS(t)
+
+	info, err := nfs.Stat(cwdPath)
+	if err != nil {
+		t.Fatalf("Stat(%q) = %v, want nil", cwdPath, err)
+	}
+	if !info.IsDir() {
+		t.Error("Stat('.').IsDir() = false, want true")
+	}
+}
+
+func TestNullFSStatInvalid(t *testing.T) {
+	nfs := mustNullFS(t)
+	for _, path := range []string{"/absolute", "../parent", "invalid/../path"} {
+		if _, err := nfs.Stat(path); err == nil {
+			t.Errorf("Stat(%q) = nil error, want error", path)
+		}
 	}
 }
 

@@ -61,6 +61,16 @@ func TestTempMountFSCleanup(t *testing.T) {
 	}
 }
 
+func TestTempMountFSCloseError(t *testing.T) {
+	// Use an angry FS so that lfs.Close() returns an error.
+	angry := makeAngryFS(angryFSPrefix)
+	tfs := makeTempMountFS(angry, "test://", func() error { return nil })
+	err := tfs.Close()
+	if err == nil {
+		t.Fatal("Close() = nil, want error from angry lfs")
+	}
+}
+
 func TestTempMountFSPrepareError(t *testing.T) {
 	var capturedDir string
 	wantErr := errors.New("prepare failed")

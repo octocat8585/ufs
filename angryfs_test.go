@@ -146,6 +146,28 @@ func TestAngryFSString(t *testing.T) {
 	}
 }
 
+func TestAngryFSStat(t *testing.T) {
+	for _, tc := range testassetFilenameList {
+		t.Run(tc, func(t *testing.T) {
+			fsys := mustAngryFS(t)
+			if _, err := fsys.Stat(tc); !errors.Is(err, fs.ErrInvalid) {
+				t.Errorf("Stat(%q) = %v, want %v", tc, err, fs.ErrInvalid)
+			}
+		})
+	}
+}
+
+func TestAngryFSStatInvalid(t *testing.T) {
+	for _, tc := range []string{"/absolute", "../parent", "bad/../path"} {
+		t.Run(tc, func(t *testing.T) {
+			fsys := mustAngryFS(t)
+			if _, err := fsys.Stat(tc); err == nil {
+				t.Errorf("Stat(%q) = nil error, want error", tc)
+			}
+		})
+	}
+}
+
 func mustAngryFS(tb testing.TB) *angryFS {
 	fsys, err := newAngryFS(angryFSPrefix)
 	if err != nil {

@@ -738,6 +738,37 @@ func TestMemFileDirRead(t *testing.T) {
 	}
 }
 
+func TestMemFSClosedOperations(t *testing.T) {
+	fsys, err := newMemFS("memory://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("Stat", func(t *testing.T) {
+		if _, err := fsys.Stat("file.txt"); !errors.Is(err, fs.ErrClosed) {
+			t.Errorf("Stat() on closed memFS = %v, want fs.ErrClosed", err)
+		}
+	})
+	t.Run("ReadFile", func(t *testing.T) {
+		if _, err := fsys.ReadFile("file.txt"); !errors.Is(err, fs.ErrClosed) {
+			t.Errorf("ReadFile() on closed memFS = %v, want fs.ErrClosed", err)
+		}
+	})
+	t.Run("ReadLink", func(t *testing.T) {
+		if _, err := fsys.ReadLink("file.txt"); !errors.Is(err, fs.ErrClosed) {
+			t.Errorf("ReadLink() on closed memFS = %v, want fs.ErrClosed", err)
+		}
+	})
+	t.Run("Lstat", func(t *testing.T) {
+		if _, err := fsys.Lstat("file.txt"); !errors.Is(err, fs.ErrClosed) {
+			t.Errorf("Lstat() on closed memFS = %v, want fs.ErrClosed", err)
+		}
+	})
+}
+
 func TestMemFSStatOpName(t *testing.T) {
 	// Stat() for an invalid path must report Op = "stat", not "lstat".
 	fsys, err := newMemFS("memory://test")
