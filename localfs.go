@@ -184,7 +184,7 @@ func globWalk(fsys fs.ReadDirFS, dir, pattern string) ([]string, error) {
 }
 
 func makeLocalFS(name string) (*localFS, error) {
-	name = strings.TrimPrefix(name, "file://")
+	name = localFSNormalizePath(name)
 	absPath, err := filepath.Abs(name)
 	if err != nil {
 		return nil, err

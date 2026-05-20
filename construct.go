@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -61,13 +62,28 @@ func CreateURI(name string, nested map[string]string) (string, error) {
 
 func nameToURI(name string) (*url.URL, error) {
 	u, err := url.Parse(name)
-	if err != nil {
-		origErr := err
-		// Assume the name is a local file path.
-		u, err = url.Parse("file://" + name)
-		if err != nil {
-			return nil, fmt.Errorf("%q is not a uri for file system, %w", name, origErr)
+	if err == nil {
+		return u, nil
+	}
+	origErr := err
+	if after, ok := strings.CutPrefix(name, "file://"); ok {
+		// On Windows, "file://C:\path" fails url.Parse because the drive-letter
+		// colon is misread as a host:port separator with "\path" as an invalid
+		// port number. Recover by stripping "file://" and re-interpreting the
+		// remainder as a local path, normalizing to forward slashes.
+		localPath := filepath.ToSlash(after)
+		if !strings.HasPrefix(localPath, "/") {
+			localPath = "/" + localPath
 		}
+		return &url.URL{Scheme: "file", Path: localPath}, nil
+	}
+	if strings.Contains(name, "://") {
+		return nil, fmt.Errorf("%q is not a uri for file system, %w", name, origErr)
+	}
+	// Assume the name is a local file path.
+	u, err = url.Parse("file://" + name)
+	if err != nil {
+		return nil, fmt.Errorf("%q is not a uri for file system, %w", name, origErr)
 	}
 	return u, nil
 }
