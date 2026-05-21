@@ -356,7 +356,7 @@ func (fsys *nestFS) ReadDir(name string) ([]fs.DirEntry, error) {
 
 	readDirFile, ok := f.(fs.ReadDirFile)
 	if !ok {
-		return nil, pathError("readDir", name, fmt.Errorf("%s is not a directory", name))
+		return nil, pathError("readdir", name, fmt.Errorf("%s is not a directory", name))
 	}
 
 	dirs, err := readDirFile.ReadDir(-1)

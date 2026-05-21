@@ -76,15 +76,15 @@ func (n *nullFile) Write(p []byte) (n2 int, err error) {
 	return len(p), nil
 }
 
-func (f *nullFile) Seek(offset int64, whence int) (int64, error) {
+func (n *nullFile) Seek(offset int64, whence int) (int64, error) {
 	return 0, nil
 }
 
-func (f *nullFile) ReadAt(p []byte, off int64) (int, error) {
+func (n *nullFile) ReadAt(p []byte, off int64) (int, error) {
 	return 0, io.EOF
 }
 
-func (f *nullFile) WriteString(s string) (int, error) {
+func (n *nullFile) WriteString(s string) (int, error) {
 	return len(s), nil
 }
 
