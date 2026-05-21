@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -34,6 +35,69 @@ func TestCreateOSTempDirectory(t *testing.T) {
 	cleanup()
 	if osExists(dir) {
 		t.Errorf("'%s' exists when it should not", dir)
+	}
+}
+
+func TestOSDeleteFile(t *testing.T) {
+	t.Run("nonexistent", func(t *testing.T) {
+		err := osDeleteFile("/nonexistent/path/that/cannot/exist-" + t.Name() + ".txt")
+		if err != nil {
+			t.Errorf("osDeleteFile(nonexistent) = %v, want nil", err)
+		}
+	})
+
+	t.Run("existing", func(t *testing.T) {
+		f, err := os.CreateTemp("", "ufs-osutil-test-*.txt")
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := f.Name()
+		f.Close()
+
+		if err := osDeleteFile(p); err != nil {
+			t.Errorf("osDeleteFile(existing) = %v, want nil", err)
+		}
+		if osExists(p) {
+			t.Errorf("%q still exists after osDeleteFile", p)
+		}
+	})
+}
+
+func TestTryOSDeleteFile(t *testing.T) {
+	f, err := os.CreateTemp("", "ufs-try-delete-*.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := f.Name()
+	f.Close()
+
+	tryOSDeleteFile(p)
+	if osExists(p) {
+		t.Errorf("%q still exists after tryOSDeleteFile", p)
+	}
+}
+
+func TestOSDeleteDirectoryExists(t *testing.T) {
+	dir, err := os.MkdirTemp("", "ufs-del-dir-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := osDeleteDirectory(dir); err != nil {
+		t.Errorf("osDeleteDirectory(existing) = %v, want nil", err)
+	}
+	if osExists(dir) {
+		t.Errorf("%q still exists after osDeleteDirectory", dir)
+	}
+}
+
+func TestTryOSDeleteDirectory(t *testing.T) {
+	dir, err := os.MkdirTemp("", "ufs-try-del-dir-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tryOSDeleteDirectory(dir)
+	if osExists(dir) {
+		t.Errorf("%q still exists after tryOSDeleteDirectory", dir)
 	}
 }
 

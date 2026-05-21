@@ -232,6 +232,62 @@ func TestArchiveFSReadDirSubdir(t *testing.T) {
 	}
 }
 
+func TestArchiveFSReadLink(t *testing.T) {
+	fsys := mustArchiveFS(t)
+
+	_, err := fsys.ReadLink("index.html")
+	if err == nil {
+		t.Fatal("ReadLink() = nil error, want error (archives have no symlinks)")
+	}
+	if !errors.Is(err, fs.ErrInvalid) {
+		t.Errorf("ReadLink() error = %v, want to wrap fs.ErrInvalid", err)
+	}
+}
+
+func TestArchiveFSReadLinkInvalid(t *testing.T) {
+	fsys := mustArchiveFS(t)
+
+	for _, p := range []string{"/absolute/path", "../relative/path", "invalid/../path"} {
+		if _, err := fsys.ReadLink(p); err == nil {
+			t.Errorf("ReadLink(%q) succeeded, want error", p)
+		}
+	}
+}
+
+func TestArchiveFSLstat(t *testing.T) {
+	fsys := mustArchiveFS(t)
+
+	info, err := fsys.Lstat("index.html")
+	if err != nil {
+		t.Fatalf("Lstat(%q) = %v, want nil", "index.html", err)
+	}
+	if info == nil {
+		t.Fatal("Lstat() returned nil info")
+	}
+	if info.Name() != "index.html" {
+		t.Errorf("Lstat().Name() = %q, want %q", info.Name(), "index.html")
+	}
+}
+
+func TestArchiveFSLstatInvalid(t *testing.T) {
+	fsys := mustArchiveFS(t)
+
+	for _, p := range []string{"/absolute/path", "../relative/path", "invalid/../path"} {
+		if _, err := fsys.Lstat(p); err == nil {
+			t.Errorf("Lstat(%q) succeeded, want error", p)
+		}
+	}
+}
+
+func TestArchiveFSStatNonExistent(t *testing.T) {
+	fsys := mustArchiveFS(t)
+
+	_, err := fsys.Stat("nonexistent-file-that-does-not-exist.txt")
+	if err == nil {
+		t.Fatal("Stat() = nil error, want error for nonexistent file")
+	}
+}
+
 func TestArchiveFSReadDirInvalid(t *testing.T) {
 	fsys := mustArchiveFS(t)
 
