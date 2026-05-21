@@ -31,17 +31,17 @@ jobs:
         # - "oldstable"
         goos:
         - "darwin"
-        - "freebsd"
+        #- "freebsd"
         - "linux"
-        - "netbsd"
-        - "openbsd"
-        - "windows"
+        #- "netbsd"
+        #- "openbsd"
+        #- "windows"
         # Doesn't work
         #- "android"
         #- "ios"
         goarch:
         - "amd64"
-        - "arm"
+        #- "arm"
         - "arm64"
         exclude:
         - goos: "darwin"
