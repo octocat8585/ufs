@@ -123,7 +123,11 @@ func TestAngryFSReadDir(t *testing.T) {
 
 func TestAngryFSGlob(t *testing.T) {
 	fsys := mustAngryFS(t)
-	if _, err := fsys.Glob("*.txt"); err != fs.ErrInvalid {
+	glob, ok := fsys.(fs.GlobFS)
+	if !ok {
+		t.Fatal("angryFS does not implement fs.GlobFS")
+	}
+	if _, err := glob.Glob("*.txt"); err != fs.ErrInvalid {
 		t.Errorf("Glob() = %v, want %v", err, fs.ErrInvalid)
 	}
 }
@@ -146,7 +150,7 @@ func TestAngryFSString(t *testing.T) {
 	}
 }
 
-func mustAngryFS(tb testing.TB) *angryFS {
+func mustAngryFS(tb testing.TB) FS {
 	fsys, err := newAngryFS(angryFSPrefix)
 	if err != nil {
 		tb.Fatalf("newAngryFS() returned error, %s", err)

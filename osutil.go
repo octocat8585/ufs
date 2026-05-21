@@ -70,7 +70,7 @@ func osDeleteDirectory(path string) error {
 	}
 
 	if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("cannot delete directory %q, %s", path, err)
+		return fmt.Errorf("cannot delete directory %q, %w", path, err)
 	}
 	return nil
 }

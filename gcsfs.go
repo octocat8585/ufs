@@ -355,6 +355,9 @@ func (fsys *gcsFS) Create(name string) (File, error) {
 }
 
 func (fsys *gcsFS) MkdirAll(name string, perm fs.FileMode) error {
+	if err := validPath("mkdir", name); err != nil {
+		return err
+	}
 	// GCS has no real directories; virtual directories emerge from object prefixes.
 	return nil
 }
