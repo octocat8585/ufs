@@ -143,8 +143,7 @@ func TestFSConventions(t *testing.T) {
 }
 
 func TestFSClose(t *testing.T) {
-	// TODO: Change to getAllRegularTestCaseList
-	for _, fsysTC := range getReadWriteTestCaseList() {
+	for _, fsysTC := range getAllRegularTestCaseList() {
 		t.Run(fsysTC.name, func(t *testing.T) {
 			t.Parallel()
 			fsys := fsysTC.createFS(t)
@@ -212,8 +211,7 @@ func TestFSString(t *testing.T) {
 }
 
 func TestFSReadDir(t *testing.T) {
-	// TODO: Change to getAllRegularTestCaseList
-	for _, fsysTC := range getReadWriteTestCaseList() {
+	for _, fsysTC := range getAllRegularTestCaseList() {
 		t.Run(fsysTC.name, func(t *testing.T) {
 			t.Parallel()
 			fsys := fsysTC.createFS(t)
@@ -285,8 +283,7 @@ func TestFSReadDir(t *testing.T) {
 }
 
 func TestFSCreate(t *testing.T) {
-	// TODO: Change to getAllRegularTestCaseList
-	for _, fsysTC := range getReadWriteTestCaseList() {
+	for _, fsysTC := range getAllRegularTestCaseList() {
 		t.Run(fsysTC.name, func(t *testing.T) {
 			t.Parallel()
 			fsys := fsysTC.createFS(t)
@@ -348,7 +345,6 @@ func TestFSCreate(t *testing.T) {
 
 					t.Run("ReadLink", func(t *testing.T) {
 						lfilename, err := fsys.ReadLink(filename)
-						// TODO: Should this be an error or not? It seems li
 						if err == nil {
 							t.Errorf("ReadLink(%q) error was nil", filename)
 						} else if _, ok := err.(*fs.PathError); !ok {

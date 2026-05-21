@@ -17,7 +17,6 @@ package ufs
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -166,25 +165,12 @@ func newArchiveFSFromFile(file fs.File) (*archiveFS, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: Replace all the logic below with,
-	// archives.FileSystem(ctx, name, archives.ReaderAtSeeker)
-	format, _, err := archives.Identify(ctx, name, file)
-	if err != nil && !errors.Is(err, archives.NoMatch) {
-		return nil, err
+	r := io.NewSectionReader(readerAt, 0, stat.Size())
+	afs, err := archives.FileSystem(ctx, name, r)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create archiveFS from file %q, %w", name, err)
 	}
-	if format != nil {
-		if af, ok := format.(archives.Extractor); ok {
-			r := io.NewSectionReader(readerAt, 0, stat.Size())
-			afs := archives.ArchiveFS{
-				Stream:  r,
-				Format:  af,
-				Context: ctx,
-			}
-			return makeArchiveFS(afs, name), nil
-		}
-	}
-	return nil, fmt.Errorf("cannot create archiveFS from file %q, the archive format (%v) is not recognized ", name, format)
+	return makeArchiveFS(afs, name), nil
 }
 
 func makeArchiveFS(fsys fs.FS, name string) *archiveFS {
