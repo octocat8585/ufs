@@ -21,118 +21,34 @@ on:
     branches: ["main"]
 jobs:
   build-linux:
-    runs-on: ["self-hosted", "linux"]
-    # runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version:
-        - "stable"
-        # - "oldstable"
-        goos:
-        - "darwin"
-        #- "freebsd"
-        - "linux"
-        #- "netbsd"
-        #- "openbsd"
-        #- "windows"
-        # Doesn't work
-        #- "android"
-        #- "ios"
-        goarch:
-        - "amd64"
-        #- "arm"
-        - "arm64"
-        exclude:
-        - goos: "darwin"
-          goarch: "arm"
-        - goos: "ios"
-          goarch: "arm"
-        - goos: "windows"
-          goarch: "arm"
+    runs-on: ["self-hosted", "linux", "large"]
     steps:
       - name: Checkout
+        # https://github.com/actions/checkout
         uses: actions/checkout@v6
-      - name: Setup Go ${{ matrix.go-version }}
+      - name: Setup Go
+        # https://github.com/actions/setup-go
         uses: actions/setup-go@v6
         with:
-          go-version: ${{ matrix.go-version }}
-      # You can test your matrix by printing the current Go version
-      - name: Display Go version
-        run: go version
-      - name: Format
-        run: go fmt ./...
-      - name: Vet
-        run: go vet ./...
+          go-version: stable
       - name: Build
-        run: go build ./...
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
+        run: make build -j$(nproc)
       - name: Test
-        run: go test ./...
-        env:
-          CGO_ENABLED: 0
-      - name: Test (Race Test)
-        run: go test -race -count 10 ./...
-        env:
-          CGO_ENABLED: 1
+        run: make test
+      - name: Test (Deflake)
+        run: make test-deflake
   build-windows:
     runs-on: ["self-hosted", "windows"]
-    # runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version:
-        - "stable"
-        # - "oldstable"
-        goos:
-        #- "darwin"
-        #- "freebsd"
-        #- "linux"
-        #- "netbsd"
-        #- "openbsd"
-        - "windows"
-        # Doesn't work
-        #- "android"
-        #- "ios"
-        goarch:
-        - "amd64"
-        - "arm"
-        - "arm64"
-        exclude:
-        - goos: "darwin"
-          goarch: "arm"
-        - goos: "ios"
-          goarch: "arm"
-        - goos: "windows"
-          goarch: "arm"
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Setup Go ${{ matrix.go-version }}
+      - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: ${{ matrix.go-version }}
-      # You can test your matrix by printing the current Go version
-      - name: Display Go version
-        run: go version
-      - name: Format
-        run: go fmt ./...
-      - name: Vet
-        run: go vet ./...
+          go-version: stable
       - name: Build
-        run: go build ./...
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
+        run: make all -j8
       - name: Test
-        run: go test ./...
-        env:
-          CGO_ENABLED: 0
+        run: make test
       - name: Test (Race Test)
-        run: go test -race -count 10 ./...
-        env:
-          CGO_ENABLED: 1
+        run: make GO_TEST_COUNT=10 test-deflake
