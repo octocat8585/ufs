@@ -145,13 +145,12 @@ func coerceToReaderAt(file fs.File) (io.ReaderAt, error) {
 	}
 }
 
-func newArchiveFSFromFile(file fs.File) (*archiveFS, error) {
+func newArchiveFSFromFile(ctx context.Context, file fs.File) (*archiveFS, error) {
 	stat, err := file.Stat()
 	if err != nil {
 		return nil, err
 	}
 
-	ctx := context.Background()
 	name := stat.Name()
 	if readerAtSeeker, ok := file.(archives.ReaderAtSeeker); ok {
 		afs, err := archives.FileSystem(ctx, name, readerAtSeeker)
@@ -180,7 +179,7 @@ func makeArchiveFS(fsys fs.FS, name string) *archiveFS {
 	}
 }
 
-func newTempMountRemoteArchiveFS(name string) (FS, error) {
+func newTempMountRemoteArchiveFS(ctx context.Context, name string) (FS, error) {
 	tempDir, cleanup, err := createOSTempDirectory()
 	if err != nil {
 		cleanup()
@@ -193,7 +192,6 @@ func newTempMountRemoteArchiveFS(name string) (FS, error) {
 		return nil, err
 	}
 
-	ctx := context.Background()
 	fsys, err := newArchiveFSFromLocalFS(ctx, filename)
 	if err != nil {
 		cleanup()

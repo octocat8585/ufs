@@ -24,7 +24,7 @@ import (
 )
 
 func TestNewBaseFSInvalid(t *testing.T) {
-	_, err := newBaseFS("unknown://surely-not-a-path-xyz")
+	_, err := newBaseFS(t.Context(), "unknown://surely-not-a-path-xyz")
 	if err == nil {
 		t.Error("newBaseFS(unknown://) succeeded, want error")
 	}
@@ -92,7 +92,7 @@ func TestNew(t *testing.T) {
 			if tt.nested {
 				t.Skip("test case requires nestFS support")
 			}
-			got, err := newBaseFS(tt.uri)
+			got, err := newBaseFS(t.Context(), tt.uri)
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("getBaseFS(%q) = %q, want error", tt.uri, got)
@@ -109,7 +109,7 @@ func TestNew(t *testing.T) {
 			}
 		})
 		t.Run(fmt.Sprintf("New(%q)", tt.uri), func(t *testing.T) {
-			got, err := New(tt.uri)
+			got, err := New(t.Context(), tt.uri)
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("getBaseFS(%q) = %q, want error", tt.uri, got)
@@ -178,7 +178,7 @@ func TestCreateURI(t *testing.T) {
 			if got != tc.want {
 				t.Errorf("CreateURI(%q, %v) got: %q, want: %q", tc.name, tc.mounts, got, tc.want)
 			}
-			fsys, err := New(got)
+			fsys, err := New(t.Context(), got)
 			if err != nil {
 				t.Fatalf("New(%q) got error: %s", got, err)
 			}
@@ -280,7 +280,7 @@ func TestCreateURIWithSiblingMounts(t *testing.T) {
 				t.Fatalf("CreateURI(%q, ...) = %v, want nil", tt.base, err)
 			}
 
-			fsys, err := New(uri)
+			fsys, err := New(t.Context(), uri)
 			if err != nil {
 				t.Fatalf("New(%q) = %v, want nil", uri, err)
 			}
@@ -384,7 +384,7 @@ func TestNewSiblingMountsAccess(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			fsys, err := New(uri)
+			fsys, err := New(t.Context(), uri)
 			if err != nil {
 				t.Fatalf("New(%q) = %v", uri, err)
 			}

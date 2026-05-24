@@ -95,11 +95,11 @@ func TestNewWindowsDriveLetters(t *testing.T) {
 				t.Skipf("drive %s: not available: %v", letter, err)
 			}
 			for _, name := range []string{
-				letter + `:`,        // D:  — current directory of the drive
-				letter + `:\`,       // D:\ — root of the drive
+				letter + `:`,              // D:  — current directory of the drive
+				letter + `:\`,             // D:\ — root of the drive
 				`file://` + letter + `:\`, // file://D:\
 			} {
-				fsys, err := New(name)
+				fsys, err := New(t.Context(), name)
 				if err != nil {
 					t.Errorf("New(%q) = %v, want nil", name, err)
 					continue

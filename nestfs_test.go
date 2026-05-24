@@ -25,7 +25,7 @@ import (
 )
 
 func TestNewNestFS(t *testing.T) {
-	fsys, err := newNestFS("memory://")
+	fsys, err := newNestFS(t.Context(), "memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestNewNestFS(t *testing.T) {
 }
 
 func TestNewNestFSInvalid(t *testing.T) {
-	_, err := newNestFS("invalid://scheme")
+	_, err := newNestFS(t.Context(), "invalid://scheme")
 	if err == nil {
 		t.Fatal("newNestFS with invalid scheme should return an error")
 	}
@@ -47,19 +47,19 @@ func TestMountMap(t *testing.T) {
 	afs := makeAngryFS(angryFSPrefix)
 	nfs := mustNullFS(t)
 
-	must(t, mm.put("mounts/null", makeNestFS(nfs)))
-	must(t, mm.put("mounts/mem", makeNestFS(mfs)))
-	must(t, mm.put("mounts/angry", makeNestFS(afs)))
-	must(t, mm.put("null", makeNestFS(nfs)))
-	must(t, mm.put("mem", makeNestFS(mfs)))
-	must(t, mm.put("angry", makeNestFS(afs)))
-	must(t, mm.put("mounts/level2/a/null", makeNestFS(nfs)))
-	must(t, mm.put("mounts/level2/a/mem", makeNestFS(mfs)))
-	must(t, mm.put("mounts/level2/angry", makeNestFS(afs)))
-	if err := mm.put("mounts/level2/angry/angry", makeNestFS(afs)); err == nil {
+	must(t, mm.put("mounts/null", makeNestFS(t.Context(), nfs)))
+	must(t, mm.put("mounts/mem", makeNestFS(t.Context(), mfs)))
+	must(t, mm.put("mounts/angry", makeNestFS(t.Context(), afs)))
+	must(t, mm.put("null", makeNestFS(t.Context(), nfs)))
+	must(t, mm.put("mem", makeNestFS(t.Context(), mfs)))
+	must(t, mm.put("angry", makeNestFS(t.Context(), afs)))
+	must(t, mm.put("mounts/level2/a/null", makeNestFS(t.Context(), nfs)))
+	must(t, mm.put("mounts/level2/a/mem", makeNestFS(t.Context(), mfs)))
+	must(t, mm.put("mounts/level2/angry", makeNestFS(t.Context(), afs)))
+	if err := mm.put("mounts/level2/angry/angry", makeNestFS(t.Context(), afs)); err == nil {
 		t.Fatal("'mounts/level2/angry/angry' should not be mountable because of 'mounts/level2/angry'")
 	}
-	if err := mm.put("mounts", makeNestFS(afs)); err == nil {
+	if err := mm.put("mounts", makeNestFS(t.Context(), afs)); err == nil {
 		t.Fatal("'mounts' should not be mountable because of 'mounts/null'")
 	}
 
@@ -207,7 +207,7 @@ func TestMountMap(t *testing.T) {
 }
 
 func TestNestFSFull(t *testing.T) {
-	fsys, err := newNestFS(cwdPath)
+	fsys, err := newNestFS(t.Context(), cwdPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestNestFSFull(t *testing.T) {
 }
 
 func TestNestedFS(t *testing.T) {
-	fsys, err := New("memory://?a=file:///&mounted/null=null://&mounted/angry=angry://")
+	fsys, err := New(t.Context(), "memory://?a=file:///&mounted/null=null://&mounted/angry=angry://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestNestedFS(t *testing.T) {
 }
 
 func TestNestFSReadDir(t *testing.T) {
-	fsys, err := newNestFS("memory://")
+	fsys, err := newNestFS(t.Context(), "memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestNestFSReadDir(t *testing.T) {
 }
 
 func TestNestFSReadDirOnFile(t *testing.T) {
-	fsys, err := newNestFS("memory://")
+	fsys, err := newNestFS(t.Context(), "memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,7 +361,7 @@ func TestGetPotentialArchives(t *testing.T) {
 }
 
 func TestNestFSStat(t *testing.T) {
-	fsys, err := newNestFS("memory://")
+	fsys, err := newNestFS(t.Context(), "memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,7 +395,7 @@ func TestNestFS(t *testing.T) {
 }
 
 func TestNestReadDirFileRead(t *testing.T) {
-	fsys, err := newNestFS("memory://")
+	fsys, err := newNestFS(t.Context(), "memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,7 +420,7 @@ func TestNestReadDirFileRead(t *testing.T) {
 }
 
 func TestNestFSCloseAngryFS(t *testing.T) {
-	nfs := makeNestFS(makeAngryFS(angryFSPrefix))
+	nfs := makeNestFS(t.Context(), makeAngryFS(angryFSPrefix))
 	err := nfs.Close()
 	if err == nil {
 		t.Fatal("Close() of nestFS wrapping angryFS = nil, want error")
@@ -429,8 +429,8 @@ func TestNestFSCloseAngryFS(t *testing.T) {
 
 func TestNestFSCloseMountError(t *testing.T) {
 	// A nestFS whose mount itself fails to close should propagate the error.
-	outer := makeNestFS(makeNullFS("null://"))
-	angryMount := makeNestFS(makeAngryFS(angryFSPrefix))
+	outer := makeNestFS(t.Context(), makeNullFS("null://"))
+	angryMount := makeNestFS(t.Context(), makeAngryFS(angryFSPrefix))
 	if err := outer.addMount("angry", angryMount); err != nil {
 		t.Fatal(err)
 	}
@@ -442,7 +442,7 @@ func TestNestFSCloseMountError(t *testing.T) {
 
 func TestMountMapCloseError(t *testing.T) {
 	mm := makeMountMap("test")
-	angryNFS := makeNestFS(makeAngryFS(angryFSPrefix))
+	angryNFS := makeNestFS(t.Context(), makeAngryFS(angryFSPrefix))
 	if err := mm.put("angry", angryNFS); err != nil {
 		t.Fatal(err)
 	}
@@ -455,7 +455,7 @@ func TestMountMapCloseError(t *testing.T) {
 func TestNestFSGlobFallback(t *testing.T) {
 	// archiveFS does not implement fs.GlobFS, triggering the globFS fallback in nestFS.
 	afs := mustArchiveFS(t)
-	nfs := makeNestFS(afs)
+	nfs := makeNestFS(t.Context(), afs)
 	defer nfs.Close()
 
 	matches, err := nfs.Glob("*.html")
@@ -468,7 +468,7 @@ func TestNestFSGlobFallback(t *testing.T) {
 }
 
 func TestNestFSOperations(t *testing.T) {
-	fsys, err := newNestFS("memory://")
+	fsys, err := newNestFS(t.Context(), "memory://")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -536,7 +536,7 @@ func TestNestFSOperations(t *testing.T) {
 }
 
 func TestNestFSValidPathClosed(t *testing.T) {
-	fsys, err := newNestFS("memory://")
+	fsys, err := newNestFS(t.Context(), "memory://")
 	if err != nil {
 		t.Fatal(err)
 	}

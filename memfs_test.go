@@ -76,7 +76,7 @@ func TestNewMemFS(t *testing.T) {
 }
 
 func TestMemFS(t *testing.T) {
-	testFileSystem(t, newMemFS, "memory://test")
+	testFileSystem(t, newFSFuncWithoutContext(newMemFS), "memory://test")
 }
 
 func TestMemFSCreate(t *testing.T) {

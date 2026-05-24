@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"log"
@@ -23,7 +24,8 @@ import (
 // ExampleNew_memory demonstrates a volatile in-memory file system. All data is
 // lost when the FS is closed or the process exits.
 func ExampleNew_memory() {
-	fsys, err := New("memory://")
+	ctx := context.Background()
+	fsys, err := New(ctx, "memory://")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -48,7 +50,8 @@ func ExampleNew_memory() {
 // Create calls without error, but data is immediately discarded. Reads always
 // return empty content. Useful as a write sink in tests.
 func ExampleNew_null() {
-	fsys, err := New("null://")
+	ctx := context.Background()
+	fsys, err := New(ctx, "null://")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,8 +75,9 @@ func ExampleNew_null() {
 
 // ExampleCopy shows copying a single file between two file systems.
 func ExampleCopy() {
-	src, _ := New("memory://")
-	dst, _ := New("memory://")
+	ctx := context.Background()
+	src, _ := New(ctx, "memory://")
+	dst, _ := New(ctx, "memory://")
 	defer src.Close()
 	defer dst.Close()
 
@@ -92,8 +96,9 @@ func ExampleCopy() {
 
 // ExampleRsync shows recursively mirroring all files from one FS into another.
 func ExampleRsync() {
-	src, _ := New("memory://")
-	dst, _ := New("memory://")
+	ctx := context.Background()
+	src, _ := New(ctx, "memory://")
+	dst, _ := New(ctx, "memory://")
 	defer src.Close()
 	defer dst.Close()
 
@@ -119,7 +124,8 @@ func ExampleRsync() {
 
 // ExampleListFiles shows listing only files (no directories) under a path.
 func ExampleListFiles() {
-	fsys, _ := New("memory://")
+	ctx := context.Background()
+	fsys, _ := New(ctx, "memory://")
 	defer fsys.Close()
 
 	fsys.MkdirAll("subdir", fs.ModePerm)
@@ -140,7 +146,8 @@ func ExampleListFiles() {
 
 // ExampleList shows listing all entries including directories.
 func ExampleList() {
-	fsys, _ := New("memory://")
+	ctx := context.Background()
+	fsys, _ := New(ctx, "memory://")
 	defer fsys.Close()
 
 	fsys.MkdirAll("subdir", fs.ModePerm)
@@ -159,7 +166,8 @@ func ExampleList() {
 // ExampleForEachFilename shows streaming file names without building a slice,
 // which saves memory for large trees.
 func ExampleForEachFilename() {
-	fsys, _ := New("memory://")
+	ctx := context.Background()
+	fsys, _ := New(ctx, "memory://")
 	defer fsys.Close()
 
 	for _, name := range []string{"a.txt", "b.txt"} {
@@ -178,6 +186,7 @@ func ExampleForEachFilename() {
 
 // ExampleCreateURI shows building a URI for a file system with a nested mount.
 func ExampleCreateURI() {
+	ctx := context.Background()
 	// A memory FS with no nested mounts.
 	uri, err := CreateURI("memory://", nil)
 	if err != nil {
@@ -186,7 +195,7 @@ func ExampleCreateURI() {
 	fmt.Println(uri)
 
 	// Open it — New accepts URIs produced by CreateURI.
-	fsys, err := New(uri)
+	fsys, err := New(ctx, uri)
 	if err != nil {
 		log.Fatal(err)
 	}

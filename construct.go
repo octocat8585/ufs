@@ -32,10 +32,11 @@ import (
 //
 // Pass the returned URI directly to [New]:
 //
-//	uri, _ := ufs.CreateURI("file:///srv/data", map[string]string{
-//	    "tmp": "memory://",
-//	})
-//	fsys, _ := ufs.New(uri)
+//	 ctx := context.Background()
+//		uri, _ := ufs.CreateURI("file:///srv/data", map[string]string{
+//		    "tmp": "memory://",
+//		})
+//		fsys, _ := ufs.New(ctx, uri)
 //
 // Returns an error if name or any nested URI cannot be parsed.
 func CreateURI(name string, nested map[string]string) (string, error) {
@@ -124,19 +125,19 @@ func nameToURI(name string) (*url.URL, error) {
 // contents. No explicit configuration is required.
 //
 // Use [CreateURI] to pre-configure additional mount points before calling New.
-func New(name string) (FS, error) {
+func New(ctx context.Context, name string) (FS, error) {
 	u, err := url.Parse(name)
 	if err == nil {
-		bFS, err := newBaseFS(u.Scheme + "://" + u.Path)
+		bFS, err := newBaseFS(ctx, u.Scheme+"://"+u.Path)
 		if err == nil {
-			nFS := makeNestFS(bFS)
+			nFS := makeNestFS(ctx, bFS)
 			vals := u.Query()
 			for mountPath, mountURI := range vals {
-				mountFS, err := newBaseFS(mountURI[0])
+				mountFS, err := newBaseFS(ctx, mountURI[0])
 				if err != nil {
 					return nil, err
 				}
-				if err := nFS.addMount(mountPath, makeNestFS(mountFS)); err != nil {
+				if err := nFS.addMount(mountPath, makeNestFS(ctx, mountFS)); err != nil {
 					return nil, err
 				}
 			}
@@ -144,15 +145,14 @@ func New(name string) (FS, error) {
 		}
 	}
 
-	fsys, err := newBaseFS(name)
+	fsys, err := newBaseFS(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	return makeNestFS(fsys), nil
+	return makeNestFS(ctx, fsys), nil
 }
 
-func newBaseFS(name string) (FS, error) {
-	ctx := context.Background()
+func newBaseFS(ctx context.Context, name string) (FS, error) {
 	if isMemFSUri(name) {
 		return newMemFS(name)
 	}
@@ -172,10 +172,10 @@ func newBaseFS(name string) (FS, error) {
 		return newLocalFS(name)
 	}
 	if isGCSFSUri(name) {
-		return newGCSFS(name)
+		return newGCSFS(ctx, name)
 	}
 	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
-		return newTempMountRemoteArchiveFS(name)
+		return newTempMountRemoteArchiveFS(ctx, name)
 	}
 
 	stat, err := os.Stat(name)

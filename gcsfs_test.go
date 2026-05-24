@@ -240,9 +240,8 @@ func TestParseGCSPathErrors(t *testing.T) {
 }
 
 func TestGCSFS(t *testing.T) {
-	ctx := context.Background()
 	client := createStorage(t)
-	testFileSystem(t, func(name string) (FS, error) {
+	testFileSystem(t, func(ctx context.Context, name string) (FS, error) {
 		return newGCSFSWithClient(ctx, client, name)
 	}, "gs://first")
 }
