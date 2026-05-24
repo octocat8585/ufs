@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"context"
 	"flag"
 	"log"
 
@@ -32,7 +33,8 @@ func main() {
 }
 
 func run(dir string) error {
-	fsys, err := ufs.New(dir)
+	ctx := context.Background()
+	fsys, err := ufs.New(ctx, dir)
 	if err != nil {
 		return err
 	}

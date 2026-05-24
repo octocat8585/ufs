@@ -102,7 +102,7 @@ func TestTryOSDeleteDirectory(t *testing.T) {
 }
 
 func TestNewRemoteArchive(t *testing.T) {
-	fsys, err := New("https://github.com/mholt/archives/archive/refs/heads/main.zip")
+	fsys, err := New(t.Context(), "https://github.com/mholt/archives/archive/refs/heads/main.zip")
 	if err != nil {
 		t.Error(err)
 	}

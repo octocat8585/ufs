@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -136,19 +137,20 @@ func getAllExceptAngryTestCaseList() []fsTestCase {
 }
 
 func appendNestFSTestCase(tcl []fsTestCase) []fsTestCase {
+	ctx := context.Background()
 	result := []fsTestCase{}
 	for _, tc := range tcl {
 		result = append(result, tc, fsTestCase{
 			name: "nestFS." + tc.name,
 			createFS: func(tb testing.TB) FS {
-				return makeNestFS(tc.createFS(tb))
+				return makeNestFS(ctx, tc.createFS(tb))
 			},
 		})
 	}
 	return result
 }
 
-func testFileSystem(t *testing.T, newFSFunc func(name string) (FS, error), name string) {
+func testFileSystem(t *testing.T, newFSFunc func(ctx context.Context, name string) (FS, error), name string) {
 	t.Helper()
 	fsys := mustFS(t, newFSFunc, name)
 
@@ -229,10 +231,16 @@ func mkdirForTest(tb testing.TB, fsys FS, dirs ...string) {
 	}
 }
 
-func mustFS(tb testing.TB, newFSFunc func(name string) (FS, error), name string) FS {
+func newFSFuncWithoutContext(fn func(name string) (FS, error)) func(ctx context.Context, name string) (FS, error) {
+	return func(ctx context.Context, name string) (FS, error) {
+		return fn(name)
+	}
+}
+
+func mustFS(tb testing.TB, newFSFunc func(ctx context.Context, name string) (FS, error), name string) FS {
 	tb.Helper()
 
-	fsys, err := newFSFunc(name)
+	fsys, err := newFSFunc(tb.Context(), name)
 	if err != nil {
 		tb.Fatalf("FileSystem %q has an error, %s", name, err)
 	}

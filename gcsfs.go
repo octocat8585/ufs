@@ -418,11 +418,7 @@ func (fsys *gcsFS) Lstat(name string) (fs.FileInfo, error) {
 	return f.Stat()
 }
 
-func newGCSFS(name string) (FS, error) {
-	return newGCSFSWithContext(name, context.Background())
-}
-
-func newGCSFSWithContext(name string, ctx context.Context) (*gcsFS, error) {
+func newGCSFS(ctx context.Context, name string) (*gcsFS, error) {
 	gcsClient, err := storage.NewClient(ctx)
 	if err != nil {
 		if strings.Contains(err.Error(), "credentials") {

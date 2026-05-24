@@ -152,6 +152,7 @@ func makeMountMap(baseName string) *mountMap {
 // This means that any archive can opened and read automatically. Archives are revealed via $filename.d name pattern.
 type nestFS struct {
 	fsys   FS
+	ctx    context.Context
 	mounts *mountMap
 }
 
@@ -203,7 +204,7 @@ func (fsys *nestFS) mountArchive(name string) (*nestFS, error) {
 	if maybeFS := fsys.mounts.getMount(name + archiveDirExt); maybeFS != nil {
 		return maybeFS, nil
 	}
-	ctx := context.Background()
+	ctx := fsys.ctx
 	lfs, ok := fsys.fsys.(*localFS)
 	var newFS *archiveFS
 	if ok {
@@ -220,13 +221,13 @@ func (fsys *nestFS) mountArchive(name string) (*nestFS, error) {
 		if err != nil {
 			return nil, pathError("mount", name, err)
 		}
-		newFS, err = newArchiveFSFromFile(f)
+		newFS, err = newArchiveFSFromFile(ctx, f)
 		if err != nil {
 			return nil, pathError("mount", name, err)
 		}
 	}
 
-	wrapped := makeNestFS(newFS)
+	wrapped := makeNestFS(ctx, newFS)
 	if err := fsys.addMount(name+archiveDirExt, wrapped); err != nil {
 		return nil, err
 	}
@@ -450,17 +451,18 @@ func (fsys *nestFS) validPath(op string, name string) error {
 	return nil
 }
 
-func newNestFS(name string) (FS, error) {
-	fsys, err := newBaseFS(name)
+func newNestFS(ctx context.Context, name string) (FS, error) {
+	fsys, err := newBaseFS(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	return makeNestFS(fsys), nil
+	return makeNestFS(ctx, fsys), nil
 }
 
-func makeNestFS(fsys FS) *nestFS {
+func makeNestFS(ctx context.Context, fsys FS) *nestFS {
 	return &nestFS{
 		fsys:   fsys,
+		ctx:    ctx,
 		mounts: makeMountMap(fsys.String()),
 	}
 }

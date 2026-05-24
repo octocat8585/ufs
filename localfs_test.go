@@ -61,12 +61,12 @@ func TestIsLocalFSUri(t *testing.T) {
 
 func TestLocalFS(t *testing.T) {
 	dir := mustTemp(t)
-	testFileSystem(t, newLocalFS, dir)
+	testFileSystem(t, newFSFuncWithoutContext(newLocalFS), dir)
 }
 
 func TestLocalFSLstat(t *testing.T) {
 	dir := mustTemp(t)
-	fsys := mustFS(t, newLocalFS, dir)
+	fsys := mustFS(t, newFSFuncWithoutContext(newLocalFS), dir)
 	defer fsys.Close()
 
 	f, err := fsys.Create("lstat_file.txt")
@@ -110,7 +110,7 @@ func TestLocalFSLstat(t *testing.T) {
 
 func TestLocalFSReadLink(t *testing.T) {
 	dir := mustTemp(t)
-	fsys := mustFS(t, newLocalFS, dir)
+	fsys := mustFS(t, newFSFuncWithoutContext(newLocalFS), dir)
 	defer fsys.Close()
 
 	f, err := fsys.Create("target.txt")
