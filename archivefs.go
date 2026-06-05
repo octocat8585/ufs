@@ -15,10 +15,8 @@
 package ufs
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"io/fs"
 	"strings"
 
@@ -131,45 +129,20 @@ func newArchiveFSFromLocalFS(ctx context.Context, name string) (*archiveFS, erro
 	return makeArchiveFS(fsys, name), nil
 }
 
-func coerceToReaderAt(file fs.File) (io.ReaderAt, error) {
-	readerAt, ok := file.(io.ReaderAt)
-	if ok {
-		return readerAt, nil
-	} else {
-		// TODO: This is very inefficient because it's reading a nested zip file into memory.
-		data, err := io.ReadAll(file)
-		if err != nil {
-			return nil, err
-		}
-		return bytes.NewReader(data), err
-	}
-}
-
 func newArchiveFSFromFile(ctx context.Context, file fs.File) (*archiveFS, error) {
 	stat, err := file.Stat()
 	if err != nil {
 		return nil, err
 	}
-
-	name := stat.Name()
-	if readerAtSeeker, ok := file.(archives.ReaderAtSeeker); ok {
-		afs, err := archives.FileSystem(ctx, name, readerAtSeeker)
-		if err != nil {
-			return nil, err
-		}
-		return makeArchiveFS(afs, name), nil
+	readerAtSeeker, ok := file.(archives.ReaderAtSeeker)
+	if !ok {
+		return nil, fmt.Errorf("cannot mount archive %q: file does not support seek and random read", stat.Name())
 	}
-
-	readerAt, err := coerceToReaderAt(file)
+	afs, err := archives.FileSystem(ctx, stat.Name(), readerAtSeeker)
 	if err != nil {
 		return nil, err
 	}
-	r := io.NewSectionReader(readerAt, 0, stat.Size())
-	afs, err := archives.FileSystem(ctx, name, r)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create archiveFS from file %q, %w", name, err)
-	}
-	return makeArchiveFS(afs, name), nil
+	return makeArchiveFS(afs, stat.Name()), nil
 }
 
 func makeArchiveFS(fsys fs.FS, name string) *archiveFS {

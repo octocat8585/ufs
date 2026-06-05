@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -569,4 +570,442 @@ func TestNestFSValidPathClosed(t *testing.T) {
 	if _, err := nfs.Lstat("foo.txt"); !errors.Is(err, fs.ErrClosed) {
 		t.Errorf("Lstat on closed nestFS = %v, want fs.ErrClosed", err)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Polyfill test stubs
+//
+// Each stub implements a different subset of the File interface so tests can
+// verify that wrapReadOnlyFSFile and wrapFSFile delegate or fill in exactly
+// the right methods.
+// ---------------------------------------------------------------------------
+
+// testBareFile implements only fs.File (Stat, Read, Close).
+// No Seek, ReadAt, Write, or WriteString.
+type testBareFile struct {
+	r    *bytes.Reader
+	name string
+}
+
+func newTestBareFile(name, content string) *testBareFile {
+	return &testBareFile{r: bytes.NewReader([]byte(content)), name: name}
+}
+
+func (f *testBareFile) Stat() (fs.FileInfo, error) {
+	return &fsInfo{name: f.name, size: f.r.Size()}, nil
+}
+func (f *testBareFile) Read(p []byte) (int, error) { return f.r.Read(p) }
+func (f *testBareFile) Close() error               { return nil }
+
+// testWriterFile adds io.Writer to testBareFile. No Seek, ReadAt, or WriteString.
+type testWriterFile struct {
+	*testBareFile
+	written []byte
+}
+
+func newTestWriterFile(name, content string) *testWriterFile {
+	return &testWriterFile{testBareFile: newTestBareFile(name, content)}
+}
+
+func (f *testWriterFile) Write(p []byte) (int, error) {
+	f.written = append(f.written, p...)
+	return len(p), nil
+}
+
+// testStringWriterFile adds io.StringWriter to testWriterFile.
+type testStringWriterFile struct {
+	*testWriterFile
+	stringWriterCalled bool
+}
+
+func newTestStringWriterFile(name, content string) *testStringWriterFile {
+	return &testStringWriterFile{testWriterFile: newTestWriterFile(name, content)}
+}
+
+func (f *testStringWriterFile) WriteString(s string) (int, error) {
+	f.stringWriterCalled = true
+	return f.testWriterFile.Write([]byte(s))
+}
+
+// testSeekerFile implements fs.File + io.Seeker + io.ReaderAt (all via bytes.Reader).
+// No Write or WriteString.
+type testSeekerFile struct {
+	r    *bytes.Reader
+	name string
+}
+
+func newTestSeekerFile(name, content string) *testSeekerFile {
+	return &testSeekerFile{r: bytes.NewReader([]byte(content)), name: name}
+}
+
+func (f *testSeekerFile) Stat() (fs.FileInfo, error) {
+	return &fsInfo{name: f.name, size: f.r.Size()}, nil
+}
+func (f *testSeekerFile) Read(p []byte) (int, error)                { return f.r.Read(p) }
+func (f *testSeekerFile) Close() error                              { return nil }
+func (f *testSeekerFile) Seek(off int64, whence int) (int64, error) { return f.r.Seek(off, whence) }
+func (f *testSeekerFile) ReadAt(p []byte, off int64) (int, error)   { return f.r.ReadAt(p, off) }
+
+// ---------------------------------------------------------------------------
+// Tests for wrapReadOnlyFSFile
+// ---------------------------------------------------------------------------
+
+func TestWrapReadOnlyFSFile(t *testing.T) {
+	t.Run("fast_path_when_already_satisfies_File", func(t *testing.T) {
+		base := newNullFile("test.txt")
+		got, err := wrapReadOnlyFSFile(base)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != File(base) {
+			t.Error("expected same value; file already satisfies File so no wrapper should be created")
+		}
+	})
+
+	t.Run("read_through_buffer", func(t *testing.T) {
+		const content = "hello world"
+		wrapped, err := wrapReadOnlyFSFile(newTestBareFile("t.txt", content))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		got, err := io.ReadAll(wrapped)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != content {
+			t.Errorf("Read = %q, want %q", got, content)
+		}
+	})
+
+	t.Run("seek_to_start_after_partial_read", func(t *testing.T) {
+		const content = "hello world"
+		wrapped, err := wrapReadOnlyFSFile(newTestBareFile("t.txt", content))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		// Consume first 5 bytes.
+		if _, err := io.ReadFull(wrapped, make([]byte, 5)); err != nil {
+			t.Fatal(err)
+		}
+		pos, err := wrapped.Seek(0, io.SeekStart)
+		if err != nil {
+			t.Fatalf("Seek(0, SeekStart) = %v", err)
+		}
+		if pos != 0 {
+			t.Errorf("Seek returned %d, want 0", pos)
+		}
+		got, err := io.ReadAll(wrapped)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != content {
+			t.Errorf("Read after Seek = %q, want %q", got, content)
+		}
+	})
+
+	t.Run("seek_current_and_end", func(t *testing.T) {
+		const content = "abcdefghij" // 10 bytes
+		wrapped, err := wrapReadOnlyFSFile(newTestBareFile("t.txt", content))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		if _, err := wrapped.Seek(3, io.SeekStart); err != nil {
+			t.Fatal(err)
+		}
+		pos, err := wrapped.Seek(2, io.SeekCurrent)
+		if err != nil {
+			t.Fatalf("Seek(2, SeekCurrent) = %v", err)
+		}
+		if pos != 5 {
+			t.Errorf("Seek(+2 from 3) = %d, want 5", pos)
+		}
+		pos, err = wrapped.Seek(-3, io.SeekEnd)
+		if err != nil {
+			t.Fatalf("Seek(-3, SeekEnd) = %v", err)
+		}
+		if pos != 7 {
+			t.Errorf("Seek(-3 from end) = %d, want 7", pos)
+		}
+		buf := make([]byte, 3)
+		if _, err := io.ReadFull(wrapped, buf); err != nil {
+			t.Fatal(err)
+		}
+		if string(buf) != "hij" {
+			t.Errorf("Read after Seek(-3, SeekEnd) = %q, want %q", buf, "hij")
+		}
+	})
+
+	t.Run("readat_does_not_affect_read_position", func(t *testing.T) {
+		const content = "hello world"
+		wrapped, err := wrapReadOnlyFSFile(newTestBareFile("t.txt", content))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		buf := make([]byte, 5)
+		n, err := wrapped.ReadAt(buf, 6)
+		if err != nil || n != 5 || string(buf) != "world" {
+			t.Fatalf("ReadAt(5, 6) = %q %v; want %q nil", buf[:n], err, "world")
+		}
+		// Read position is still at 0.
+		first5 := make([]byte, 5)
+		if _, err := io.ReadFull(wrapped, first5); err != nil {
+			t.Fatal(err)
+		}
+		if string(first5) != "hello" {
+			t.Errorf("Read after ReadAt = %q, want %q", first5, "hello")
+		}
+	})
+
+	t.Run("write_always_errors", func(t *testing.T) {
+		wrapped, err := wrapReadOnlyFSFile(newTestBareFile("t.txt", "content"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		if _, err := wrapped.Write([]byte("x")); !errors.Is(err, fs.ErrInvalid) {
+			t.Errorf("Write() = %v, want fs.ErrInvalid", err)
+		}
+		if _, err := wrapped.WriteString("x"); !errors.Is(err, fs.ErrInvalid) {
+			t.Errorf("WriteString() = %v, want fs.ErrInvalid", err)
+		}
+	})
+
+	t.Run("write_always_errors_even_when_underlying_supports_write", func(t *testing.T) {
+		f := newTestWriterFile("t.txt", "content")
+		wrapped, err := wrapReadOnlyFSFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		if _, err := wrapped.Write([]byte("x")); !errors.Is(err, fs.ErrInvalid) {
+			t.Errorf("Write() = %v, want fs.ErrInvalid", err)
+		}
+		if _, err := wrapped.WriteString("x"); !errors.Is(err, fs.ErrInvalid) {
+			t.Errorf("WriteString() = %v, want fs.ErrInvalid", err)
+		}
+		if len(f.written) > 0 {
+			t.Errorf("underlying writer received %d bytes, want 0", len(f.written))
+		}
+	})
+
+	t.Run("stat_delegates_to_underlying", func(t *testing.T) {
+		wrapped, err := wrapReadOnlyFSFile(newTestBareFile("myfile.txt", "hello"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		info, err := wrapped.Stat()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Name() != "myfile.txt" {
+			t.Errorf("Stat().Name() = %q, want %q", info.Name(), "myfile.txt")
+		}
+	})
+
+	t.Run("close_releases_buffer", func(t *testing.T) {
+		got, err := wrapReadOnlyFSFile(newTestBareFile("t.txt", "content"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		nf := got.(*nestFile)
+		if nf.buf == nil {
+			t.Fatal("expected non-nil buffer before close")
+		}
+		if err := got.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if nf.buf != nil {
+			t.Error("expected nil buffer after close")
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Tests for wrapFSFile
+// ---------------------------------------------------------------------------
+
+func TestWrapFSFile(t *testing.T) {
+	t.Run("fast_path_when_already_satisfies_File", func(t *testing.T) {
+		base := newNullFile("test.txt")
+		got, err := wrapFSFile(base)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != File(base) {
+			t.Error("expected same value; file already satisfies File so no wrapper should be created")
+		}
+	})
+
+	t.Run("no_buffer_when_seek_and_readat_present", func(t *testing.T) {
+		f := newTestSeekerFile("t.txt", "hello world")
+		wrapped, err := wrapFSFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		nf := wrapped.(*nestFile)
+		if nf.buf != nil {
+			t.Error("expected nil buffer when underlying provides both Seek and ReadAt")
+		}
+		// Verify native Seek and ReadAt still work through delegation.
+		if _, err := wrapped.Seek(6, io.SeekStart); err != nil {
+			t.Fatal(err)
+		}
+		buf := make([]byte, 5)
+		if _, err := io.ReadFull(wrapped, buf); err != nil {
+			t.Fatal(err)
+		}
+		if string(buf) != "world" {
+			t.Errorf("Read after Seek(6) = %q, want %q", buf, "world")
+		}
+	})
+
+	t.Run("write_errors_without_underlying_writer", func(t *testing.T) {
+		wrapped, err := wrapFSFile(newTestBareFile("t.txt", "content"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		if _, err := wrapped.Write([]byte("x")); !errors.Is(err, fs.ErrInvalid) {
+			t.Errorf("Write() = %v, want fs.ErrInvalid", err)
+		}
+		if _, err := wrapped.WriteString("x"); !errors.Is(err, fs.ErrInvalid) {
+			t.Errorf("WriteString() = %v, want fs.ErrInvalid", err)
+		}
+	})
+
+	t.Run("write_delegates_to_underlying_writer", func(t *testing.T) {
+		f := newTestWriterFile("t.txt", "")
+		wrapped, err := wrapFSFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		if _, err := wrapped.Write([]byte("hello")); err != nil {
+			t.Errorf("Write() = %v, want nil", err)
+		}
+		if string(f.written) != "hello" {
+			t.Errorf("underlying received %q, want %q", f.written, "hello")
+		}
+	})
+
+	t.Run("writestring_derived_from_write_when_no_stringwriter", func(t *testing.T) {
+		f := newTestWriterFile("t.txt", "")
+		wrapped, err := wrapFSFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		if _, err := wrapped.WriteString("world"); err != nil {
+			t.Errorf("WriteString() = %v, want nil", err)
+		}
+		if string(f.written) != "world" {
+			t.Errorf("underlying received %q, want %q", f.written, "world")
+		}
+	})
+
+	t.Run("writestring_delegates_to_underlying_stringwriter", func(t *testing.T) {
+		f := newTestStringWriterFile("t.txt", "")
+		wrapped, err := wrapFSFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		if _, err := wrapped.WriteString("world"); err != nil {
+			t.Errorf("WriteString() = %v, want nil", err)
+		}
+		if !f.stringWriterCalled {
+			t.Error("expected underlying WriteString to be called directly, not derived from Write")
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Tests for the buffer polyfill behaviour (Seek / ReadAt / Read consistency)
+// ---------------------------------------------------------------------------
+
+func TestNestFilePolyfillBuffering(t *testing.T) {
+	t.Run("buffer_created_when_seek_missing", func(t *testing.T) {
+		wrapped, err := wrapFSFile(newTestBareFile("t.txt", "hello"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		if wrapped.(*nestFile).buf == nil {
+			t.Error("expected non-nil buffer when underlying lacks Seek")
+		}
+	})
+
+	t.Run("multiple_seeks_are_consistent", func(t *testing.T) {
+		const content = "abcdefghij"
+		wrapped, err := wrapFSFile(newTestBareFile("t.txt", content))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		for _, tc := range []struct {
+			offset int64
+			want   string
+		}{
+			{0, "abcde"},
+			{5, "fghij"},
+			{3, "defgh"},
+			{0, "abcde"},
+		} {
+			if _, err := wrapped.Seek(tc.offset, io.SeekStart); err != nil {
+				t.Fatalf("Seek(%d) = %v", tc.offset, err)
+			}
+			buf := make([]byte, 5)
+			if _, err := io.ReadFull(wrapped, buf); err != nil {
+				t.Fatalf("ReadFull after Seek(%d) = %v", tc.offset, err)
+			}
+			if string(buf) != tc.want {
+				t.Errorf("Seek(%d) then Read = %q, want %q", tc.offset, buf, tc.want)
+			}
+		}
+	})
+
+	t.Run("readat_at_various_offsets", func(t *testing.T) {
+		const content = "abcdefghij"
+		wrapped, err := wrapFSFile(newTestBareFile("t.txt", content))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		for _, tc := range []struct {
+			off  int64
+			n    int
+			want string
+		}{
+			{0, 3, "abc"},
+			{7, 3, "hij"},
+			{4, 4, "efgh"},
+		} {
+			buf := make([]byte, tc.n)
+			n, err := wrapped.ReadAt(buf, tc.off)
+			if err != nil || n != tc.n || string(buf) != tc.want {
+				t.Errorf("ReadAt(%d, %d) = %q %v; want %q nil", tc.n, tc.off, buf[:n], err, tc.want)
+			}
+		}
+	})
 }
