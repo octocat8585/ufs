@@ -15,9 +15,11 @@
 package ufs
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"path"
 	"slices"
@@ -291,7 +293,7 @@ func (fsys *nestFS) Open(name string) (fs.File, error) {
 		}
 	}
 
-	return f, nil
+	return wrapReadOnlyFSFile(f)
 }
 
 func (fsys *nestFS) Close() error {
@@ -318,7 +320,11 @@ func (fsys *nestFS) Create(name string) (File, error) {
 		return nil, err
 	}
 
-	return mountFS.fsys.Create(subName)
+	f, err := mountFS.fsys.Create(subName)
+	if err != nil {
+		return nil, err
+	}
+	return wrapFSFile(f)
 }
 
 func (fsys *nestFS) MkdirAll(name string, perm fs.FileMode) error {
@@ -496,4 +502,126 @@ func makeNestReadDirFile(fsys *nestFS, name string, rdf fs.ReadDirFile) *nestRea
 		name: name,
 		rdf:  rdf,
 	}
+}
+
+var _ File = (*nestFile)(nil)
+
+// nestFile wraps an fs.File and polyfills any methods from the File interface
+// that the underlying implementation does not provide.
+//
+// When Seek or ReadAt is absent, the entire file content is read eagerly into a
+// bytes.Reader so that both operations work correctly at any position. The
+// buffer is released on Close. Read is also redirected through the buffer so
+// that the file position stays consistent across Read/Seek/ReadAt.
+type nestFile struct {
+	fs.File
+	buf             *bytes.Reader // non-nil when content is buffered for Seek/ReadAt
+	writeFunc       func([]byte) (int, error)
+	seekFunc        func(int64, int) (int64, error)
+	readAtFunc      func([]byte, int64) (int, error)
+	writeStringFunc func(string) (int, error)
+}
+
+func (f *nestFile) Read(p []byte) (int, error) {
+	if f.buf != nil {
+		return f.buf.Read(p)
+	}
+	return f.File.Read(p)
+}
+
+func (f *nestFile) Close() error {
+	f.buf = nil
+	return f.File.Close()
+}
+
+func (f *nestFile) Write(p []byte) (int, error) {
+	return f.writeFunc(p)
+}
+
+func (f *nestFile) Seek(off int64, whence int) (int64, error) {
+	return f.seekFunc(off, whence)
+}
+
+func (f *nestFile) ReadAt(p []byte, off int64) (int, error) {
+	return f.readAtFunc(p, off)
+}
+
+func (f *nestFile) WriteString(s string) (int, error) {
+	return f.writeStringFunc(s)
+}
+
+// polyfillSeekReadAt populates nf.seekFunc, nf.readAtFunc, and nf.buf for the
+// underlying file f. If f is missing either io.Seeker or io.ReaderAt the entire
+// file is read eagerly into a bytes.Reader, after which all three of Read, Seek,
+// and ReadAt are consistent. On read failure f is closed and the error returned.
+func polyfillSeekReadAt(nf *nestFile, f fs.File) error {
+	_, hasSeek := f.(io.Seeker)
+	_, hasReadAt := f.(io.ReaderAt)
+	if !hasSeek || !hasReadAt {
+		data, err := io.ReadAll(f)
+		if err != nil {
+			f.Close()
+			return err
+		}
+		nf.buf = bytes.NewReader(data)
+		nf.seekFunc = nf.buf.Seek
+		nf.readAtFunc = nf.buf.ReadAt
+		return nil
+	}
+	nf.seekFunc = f.(io.Seeker).Seek
+	nf.readAtFunc = f.(io.ReaderAt).ReadAt
+	return nil
+}
+
+// wrapReadOnlyFSFile returns f unchanged if it already satisfies File.
+// Otherwise it wraps f for read-only use: Seek and ReadAt are polyfilled via an
+// in-memory buffer when absent; Write and WriteString always return fs.ErrInvalid.
+func wrapReadOnlyFSFile(f fs.File) (File, error) {
+	if full, ok := f.(File); ok {
+		return full, nil
+	}
+	nf := &nestFile{File: f}
+	if err := polyfillSeekReadAt(nf, f); err != nil {
+		return nil, err
+	}
+	nf.writeFunc = func(p []byte) (int, error) {
+		return 0, fs.ErrInvalid
+	}
+	nf.writeStringFunc = func(s string) (int, error) {
+		return 0, fs.ErrInvalid
+	}
+	return nf, nil
+}
+
+// wrapFSFile returns f unchanged if it already satisfies File. Otherwise it
+// wraps f for read-write use: Seek and ReadAt are polyfilled via an in-memory
+// buffer when absent; Write and WriteString delegate to f when f supports them
+// and return fs.ErrInvalid otherwise.
+func wrapFSFile(f fs.File) (File, error) {
+	if full, ok := f.(File); ok {
+		return full, nil
+	}
+	nf := &nestFile{File: f}
+	if err := polyfillSeekReadAt(nf, f); err != nil {
+		return nil, err
+	}
+	if w, ok := f.(io.Writer); ok {
+		nf.writeFunc = w.Write
+	} else {
+		nf.writeFunc = func(p []byte) (int, error) {
+			return 0, fs.ErrInvalid
+		}
+	}
+	if sw, ok := f.(io.StringWriter); ok {
+		nf.writeStringFunc = sw.WriteString
+	} else if _, ok := f.(io.Writer); ok {
+		nf.writeStringFunc = func(s string) (int, error) {
+			return nf.writeFunc([]byte(s))
+		}
+	} else {
+		nf.writeStringFunc = func(s string) (int, error) {
+			return 0, fs.ErrInvalid
+		}
+	}
+	return nf, nil
 }
