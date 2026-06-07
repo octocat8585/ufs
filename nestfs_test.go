@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -191,11 +192,11 @@ func TestMountMap(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("getMount/%s", tc.input), func(t *testing.T) {
-			gotMountPath, gotSubPath, gotFS, ok := mm.getMountX(tc.input)
+		t.Run(fmt.Sprintf("getClosestMount/%s", tc.input), func(t *testing.T) {
+			gotMountPath, gotSubPath, gotFS, ok := mm.getClosestMount(tc.input)
 			wantOk := tc.wantMountPath != ""
 			if ok != wantOk {
-				t.Errorf("getMount(%q) ok got: %t, want: %t, fsys: %v", tc.input, ok, wantOk, gotFS)
+				t.Errorf("getClosestMount(%q) ok got: %t, want: %t, fsys: %v", tc.input, ok, wantOk, gotFS)
 			}
 			if diff := cmp.Diff(gotMountPath, tc.wantMountPath); diff != "" {
 				t.Errorf("got: %q, want: %q, diff: %q", gotSubPath, tc.wantMountSubPath, diff)
@@ -451,6 +452,33 @@ func TestMountMapCloseError(t *testing.T) {
 	if err == nil {
 		t.Fatal("mountMap.Close() with angry mount = nil, want error")
 	}
+}
+
+func TestMountMapConcurrentAccess(t *testing.T) {
+	mm := makeMountMap("test")
+	mfs := makeMemFS("memory:///")
+	nfs := makeNestFS(t.Context(), mfs)
+
+	const workers = 20
+	var wg sync.WaitGroup
+	wg.Add(workers * 2)
+	for i := range workers {
+		go func() {
+			defer wg.Done()
+			name := fmt.Sprintf("mount%d", i)
+			if err := mm.put(name, nfs); err != nil {
+				t.Error(err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			mm.getMount("mount0")
+			mm.getDirectoryList("")
+			mm.getMatchesBySubPath("")
+			mm.getClosestMount("mount0")
+		}()
+	}
+	wg.Wait()
 }
 
 func TestNestFSGlobFallback(t *testing.T) {
