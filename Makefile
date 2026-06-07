@@ -155,7 +155,7 @@ testing/testassets/files/weird\ \#1.txt:
 
 testing/testassets/files/weird\ \#.txt:
 	mkdir -p $(dir $@)
-	echo -n $@ > $@
+	echo -n '$@' > '$@'
 
 testing/testassets/files/weird$$.txt:
 	mkdir -p $(dir $@)

@@ -25,6 +25,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 )
 
 var (
@@ -44,11 +45,14 @@ func getPotentialArchives(name string) []string {
 }
 
 type mountMap struct {
+	mu       sync.RWMutex
 	m        map[string]*nestFS
 	baseName string
 }
 
 func (m *mountMap) put(name string, fsys *nestFS) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for mountPoint := range m.m {
 		if _, ok := removePathPrefix(mountPoint, name); ok {
 			return pathError("mount", name, fmt.Errorf("mount %q conflicts with %q. You must change the order so that mounting is properly nested. mounts: %s, %+v", name, mountPoint, m.baseName, m.m))
@@ -63,8 +67,10 @@ func (m *mountMap) put(name string, fsys *nestFS) error {
 
 func (m *mountMap) getDirectoryList(name string) []string {
 	name = path.Clean(name)
+	m.mu.RLock()
 	// If there's a mount that should handle the directory listing then we should defer to that.
 	if _, ok := m.m[name]; ok {
+		m.mu.RUnlock()
 		return []string{}
 	}
 	dirSet := map[string]any{}
@@ -74,6 +80,7 @@ func (m *mountMap) getDirectoryList(name string) []string {
 			dirSet[splitPath(subPath)[0]] = nil
 		}
 	}
+	m.mu.RUnlock()
 
 	dirs := []string{}
 	for dir := range dirSet {
@@ -86,7 +93,9 @@ func (m *mountMap) getDirectoryList(name string) []string {
 
 func (m *mountMap) getMatchesBySubPath(name string) map[string]*nestFS {
 	name = path.Clean(name)
+	m.mu.RLock()
 	if fsys, ok := m.m[name]; ok {
+		m.mu.RUnlock()
 		return map[string]*nestFS{
 			"": fsys,
 		}
@@ -98,20 +107,23 @@ func (m *mountMap) getMatchesBySubPath(name string) map[string]*nestFS {
 			matches[subPath] = subFS
 		}
 	}
+	m.mu.RUnlock()
 
 	return matches
 }
 
 func (m *mountMap) getMount(name string) *nestFS {
 	name = path.Clean(name)
+	m.mu.RLock()
 	nFS, ok := m.m[name]
+	m.mu.RUnlock()
 	if !ok {
 		return nil
 	}
 	return nFS
 }
 
-func (m *mountMap) getMountX(name string) (string, string, *nestFS, bool) {
+func (m *mountMap) getClosestMount(name string) (string, string, *nestFS, bool) {
 	name = path.Clean(name)
 	if isCwd(name) {
 		return "", "", nil, false
@@ -119,6 +131,7 @@ func (m *mountMap) getMountX(name string) (string, string, *nestFS, bool) {
 	targetMount := ""
 	targetSubPath := ""
 	var targetFS *nestFS
+	m.mu.RLock()
 	for mountPath, subFS := range m.m {
 		subPath, ok := removePathPrefix(name, mountPath)
 		if ok && (len(targetMount) < len(mountPath) || targetMount == "") {
@@ -127,11 +140,14 @@ func (m *mountMap) getMountX(name string) (string, string, *nestFS, bool) {
 			targetFS = subFS
 		}
 	}
+	m.mu.RUnlock()
 
 	return targetMount, targetSubPath, targetFS, targetFS != nil
 }
 
 func (m *mountMap) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.m != nil {
 		for mountPath, nfs := range m.m {
 			if err := nfs.Close(); err != nil {
@@ -237,14 +253,10 @@ func (fsys *nestFS) mountArchive(name string) (*nestFS, error) {
 }
 
 func (fsys *nestFS) getFSAndSubpath(name string) (*nestFS, string, error) {
-	targetFS := fsys
-	targetName := name
-	for mountPath, subFS := range fsys.mounts.m {
-		subPath, ok := removePathPrefix(name, mountPath)
-		if ok && len(subPath) < len(targetName) {
-			targetName = subPath
-			targetFS = subFS
-		}
+	_, targetName, targetFS, ok := fsys.mounts.getClosestMount(name)
+	if !ok {
+		targetFS = fsys
+		targetName = name
 	}
 
 	archiveDirNames := getPotentialArchives(targetName)
