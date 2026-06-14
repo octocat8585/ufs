@@ -37,6 +37,15 @@ jobs:
         run: make test
       - name: Test (Deflake)
         run: make test-deflake
+      - name: Zip binaries
+        run: cd bin/go && zip -qr9 ../../linux-build-bin.zip . -x 'windows_*' -x 'windows_*/*'
+      - name: Upload binaries
+        # https://github.com/actions/upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build-bin
+          retention-days: 1
+          path: linux-build-bin.zip
   build-windows:
     runs-on: ["self-hosted", "windows"]
     steps:
@@ -52,3 +61,47 @@ jobs:
         run: make test
       - name: Test (Race Test)
         run: make GO_TEST_COUNT=5 test-deflake
+      - name: Zip binaries
+        run: |
+          cd bin/go
+          zip -qr9 ../../windows-build-bin.zip windows_*
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-bin
+          retention-days: 1
+          path: windows-build-bin.zip
+  package:
+    needs: [build-linux, build-windows]
+    runs-on: ["self-hosted", "linux"]
+    permissions:
+      actions: write
+    steps:
+      - name: Download Linux binaries
+        # https://github.com/actions/download-artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-build-bin
+      - name: Download Windows binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build-bin
+      - name: Extract binaries
+        run: |
+          mkdir -p bin/go
+          unzip -oq linux-build-bin.zip -d bin/go
+          unzip -oq windows-build-bin.zip -d bin/go
+      - name: Zip binaries
+        run: cd bin/go && zip -qr9 ../../ufs-binaries.zip .
+      - name: Upload zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ufs-binaries
+          path: ufs-binaries.zip
+      - name: Delete intermediate artifacts
+        # https://github.com/GeekyEggo/delete-artifact
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: |
+            linux-build-bin
+            windows-build-bin
