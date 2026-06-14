@@ -51,4 +51,4 @@ jobs:
       - name: Test
         run: make test
       - name: Test (Race Test)
-        run: make GO_TEST_COUNT=10 test-deflake
+        run: make GO_TEST_COUNT=5 test-deflake

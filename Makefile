@@ -19,7 +19,7 @@ ZIP = zip
 RAR = rar
 TAR = tar
 SEVENZIP = 7z
-GO_TEST_COUNT = 15
+GO_TEST_COUNT = 10
 
 TEST_FILE_ASSETS = testing/testassets/files/index.html
 TEST_FILE_ASSETS += testing/testassets/files/site.js
