@@ -83,6 +83,7 @@ lint:
 	go fmt ./...
 	go vet ./...
 
+
 test: check
 
 check: $(TEST_ASSETS)
@@ -243,4 +244,9 @@ clean:
 	rm -rf bin/
 	rm -rf testing/testassets/
 
-.PHONY: all build presubmit lint test check test-100 clean testassets
+deps:
+	$(GO) get -u ./...
+	$(GO) mod tidy
+	$(GO) mod download
+
+.PHONY: all build presubmit lint test check test-100 clean deps testassets
