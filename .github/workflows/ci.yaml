@@ -31,6 +31,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: stable
+          cache: false
       - name: Build
         run: make build -j$(nproc)
       - name: Test
@@ -55,6 +56,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: stable
+          cache: false
       - name: Build
         run: make all -j8
       - name: Test
