@@ -80,17 +80,20 @@ func TestCloneOptions(t *testing.T) {
 	}
 }
 
-func TestNewGitFSUnsupportedURL(t *testing.T) {
-	_, err := newGitFS("https://github.com/foo/bar")
-	if err == nil {
-		t.Fatal("newGitFS(non-.git URL) = nil error, want error")
+func TestNewGitFSInvalid(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{"unsupported_url", "https://github.com/foo/bar"},
+		{"invalid_url", "https://invalid.nonexistent.example/repo.git"},
 	}
-}
-
-func TestNewGitFSInvalidURL(t *testing.T) {
-	_, err := newGitFS("https://invalid.nonexistent.example/repo.git")
-	if err == nil {
-		t.Fatal("newGitFS(invalid URL) = nil error, want error")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := newGitFS(tt.url); err == nil {
+				t.Fatalf("newGitFS(%q) = nil error, want error", tt.url)
+			}
+		})
 	}
 }
 
