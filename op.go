@@ -66,23 +66,19 @@ func Copy(srcFS fs.FS, srcFilename string, destFS FS, destFilename string) error
 // ForEachFilename calls f for each file path (not directory) under dir,
 // streaming results without building an intermediate slice. If fsys implements
 // [ForEachFilenameIter], its native implementation is used directly; otherwise
-// the paths are collected via [ListFiles] and iterated. f receives paths
+// the paths are collected via [fs.WalkDir] and iterated. f receives paths
 // relative to dir. The walk stops and returns the first non-nil error from f.
 func ForEachFilename(fsys fs.FS, dir string, f func(string) error) error {
 	lf, ok := fsys.(ForEachFilenameIter)
 	if ok {
 		return lf.ForEachFilename(dir, f)
 	}
-	files, err := ListFiles(fsys, dir)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
-		if err := f(file); err != nil {
+	return fs.WalkDir(fsys, dir, func(name string, d fs.DirEntry, err error) error {
+		if skip, err := excludeDirs(name, d, err); skip {
 			return err
 		}
-	}
-	return nil
+		return f(name)
+	})
 }
 
 // ForEachFileInfo calls f for each file (not directory) under dir, providing
@@ -94,22 +90,29 @@ func ForEachFileInfo(fsys fs.FS, dir string, f func(fs.FileInfo) error) error {
 	if ok {
 		return lf.ForEachFileInfo(dir, f)
 	}
-	return fs.WalkDir(fsys, dir, func(p string, d fs.DirEntry, err error) error {
-		if isCwd(p) {
-			return nil
-		}
-		if err != nil {
+	return fs.WalkDir(fsys, dir, func(name string, d fs.DirEntry, err error) error {
+		if skip, err := excludeDirs(name, d, err); skip {
 			return err
 		}
-		if d.IsDir() {
-			return nil
-		}
-		info, err := fs.Stat(fsys, p)
+		info, err := fs.Stat(fsys, name)
 		if err != nil {
 			return err
 		}
 		return f(info)
 	})
+}
+
+func excludeDirs(name string, d fs.DirEntry, err error) (bool, error) {
+	if isCwd(name) {
+		return true, nil
+	}
+	if err != nil {
+		return true, err
+	}
+	if d.IsDir() {
+		return true, nil
+	}
+	return false, nil
 }
 
 // List returns all paths (both files and directories) under dir in lexical
@@ -122,6 +125,8 @@ func List(fsys fs.FS, dir string) ([]string, error) {
 // ListFiles returns the paths of all files (excluding directories) under dir in
 // lexical order. If fsys implements [ListFilenames], its native implementation
 // is used to avoid building intermediate [fs.FileInfo] values.
+//
+// This method may take a long time since it may traverse a large file system and build a large slice of paths in memory.
 func ListFiles(fsys fs.FS, dir string) ([]string, error) {
 	lf, ok := fsys.(ListFilenames)
 	if ok {
