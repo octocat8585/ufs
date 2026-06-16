@@ -16,7 +16,9 @@ package ufs
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"strings"
 	"testing"
 
@@ -309,4 +311,91 @@ func createStorage(tb testing.TB) *storage.Client {
 	tb.Cleanup(server.Stop)
 
 	return server.Client()
+}
+
+func TestGCSFSRemove(t *testing.T) {
+	client := createStorage(t)
+	ctx := t.Context()
+	fsys, err := newGCSFSWithClient(ctx, client, "gs://first")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fsys.Close()
+
+	t.Run("file_exists", func(t *testing.T) {
+		if err := fsys.Remove("a"); err != nil {
+			t.Fatalf("Remove('a') = %v, want nil", err)
+		}
+		if _, err := fsys.Stat("a"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("after Remove, Stat('a') = %v, want ErrNotExist", err)
+		}
+	})
+
+	t.Run("not_exist", func(t *testing.T) {
+		if err := fsys.Remove("nonexistent.txt"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("Remove(nonexistent) = %v, want ErrNotExist", err)
+		}
+	})
+
+	t.Run("non_empty_dir", func(t *testing.T) {
+		if err := fsys.Remove("dir"); err == nil {
+			t.Error("Remove(non-empty dir) succeeded, want error")
+		}
+	})
+}
+
+func TestGCSFSRemoveAll(t *testing.T) {
+	ctx := t.Context()
+
+	t.Run("subtree", func(t *testing.T) {
+		client := createStorage(t)
+		fsys, err := newGCSFSWithClient(ctx, client, "gs://first")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer fsys.Close()
+
+		if err := fsys.RemoveAll("dir"); err != nil {
+			t.Fatalf("RemoveAll('dir') = %v, want nil", err)
+		}
+		if _, err := fsys.Stat("dir/c"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("after RemoveAll('dir'), Stat('dir/c') = %v, want ErrNotExist", err)
+		}
+		if _, err := fsys.Stat("a"); err != nil {
+			t.Errorf("after RemoveAll('dir'), Stat('a') = %v, want nil", err)
+		}
+	})
+
+	t.Run("not_exist_is_noop", func(t *testing.T) {
+		client := createStorage(t)
+		fsys, err := newGCSFSWithClient(ctx, client, "gs://first")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer fsys.Close()
+
+		if err := fsys.RemoveAll("nonexistent"); err != nil {
+			t.Errorf("RemoveAll(nonexistent) = %v, want nil", err)
+		}
+	})
+
+	t.Run("root", func(t *testing.T) {
+		client := createStorage(t)
+		fsys, err := newGCSFSWithClient(ctx, client, "gs://first")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer fsys.Close()
+
+		if err := fsys.RemoveAll(cwdPath); err != nil {
+			t.Fatalf("RemoveAll('.') = %v, want nil", err)
+		}
+		entries, err := fsys.ReadDir(cwdPath)
+		if err != nil {
+			t.Fatalf("ReadDir after RemoveAll('.') = %v, want nil", err)
+		}
+		if len(entries) != 0 {
+			t.Errorf("after RemoveAll('.'), expected empty FS, got %d entries", len(entries))
+		}
+	})
 }

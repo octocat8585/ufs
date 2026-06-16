@@ -76,6 +76,14 @@ func (fsys *tempMountFS) Glob(pattern string) ([]string, error) {
 	return globFS(fsys, pattern)
 }
 
+func (fsys *tempMountFS) Remove(name string) error {
+	return fsys.lfs.Remove(name)
+}
+
+func (fsys *tempMountFS) RemoveAll(name string) error {
+	return fsys.lfs.RemoveAll(name)
+}
+
 func newTempMountFS(name string, prepare func(string) error) (FS, error) {
 	tempDir, cleanup, err := createOSTempDirectory()
 	if err != nil {

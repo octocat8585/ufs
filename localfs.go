@@ -133,6 +133,20 @@ func (fsys *localFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return entries, nil
 }
 
+func (fsys *localFS) Remove(name string) error {
+	if err := validLocalPath("remove", name); err != nil {
+		return err
+	}
+	return fsys.osFS.Remove(name)
+}
+
+func (fsys *localFS) RemoveAll(name string) error {
+	if err := validLocalPath("removeall", name); err != nil {
+		return err
+	}
+	return fsys.osFS.RemoveAll(name)
+}
+
 func (fsys *localFS) Glob(pattern string) ([]string, error) {
 	return globFS(fsys, pattern)
 }

@@ -769,6 +769,114 @@ func TestMemFSClosedOperations(t *testing.T) {
 	})
 }
 
+func TestMemFSRemove(t *testing.T) {
+	fsys, err := newMemFS("memory://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fsys.Close()
+
+	f, _ := fsys.Create("hello.txt")
+	f.Close()
+
+	t.Run("file_exists", func(t *testing.T) {
+		if err := fsys.Remove("hello.txt"); err != nil {
+			t.Fatalf("Remove('hello.txt') = %v, want nil", err)
+		}
+		if _, err := fsys.Stat("hello.txt"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("after Remove, Stat returned %v, want ErrNotExist", err)
+		}
+	})
+
+	t.Run("not_exist", func(t *testing.T) {
+		if err := fsys.Remove("ghost.txt"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("Remove(nonexistent) = %v, want ErrNotExist", err)
+		}
+	})
+
+	t.Run("root_denied", func(t *testing.T) {
+		if err := fsys.Remove(cwdPath); !errors.Is(err, fs.ErrPermission) {
+			t.Errorf("Remove('.') = %v, want ErrPermission", err)
+		}
+	})
+
+	t.Run("empty_dir_ok", func(t *testing.T) {
+		fsys.MkdirAll("emptydir", fs.ModePerm)
+		if err := fsys.Remove("emptydir"); err != nil {
+			t.Errorf("Remove(empty dir) = %v, want nil", err)
+		}
+	})
+
+	t.Run("non_empty_dir_fails", func(t *testing.T) {
+		fsys.MkdirAll("nonempty", fs.ModePerm)
+		g, _ := fsys.Create("nonempty/child.txt")
+		g.Close()
+		if err := fsys.Remove("nonempty"); err == nil {
+			t.Error("Remove(non-empty dir) succeeded, want error")
+		}
+	})
+}
+
+func TestMemFSRemoveAll(t *testing.T) {
+	fsys, err := newMemFS("memory://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fsys.Close()
+
+	fsys.MkdirAll("a/b", fs.ModePerm)
+	for _, name := range []string{"a/b/x.txt", "a/y.txt", "z.txt"} {
+		g, _ := fsys.Create(name)
+		g.Close()
+	}
+
+	t.Run("subtree", func(t *testing.T) {
+		if err := fsys.RemoveAll("a"); err != nil {
+			t.Fatalf("RemoveAll('a') = %v, want nil", err)
+		}
+		if _, err := fsys.Stat("a"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("after RemoveAll('a'), Stat returned %v, want ErrNotExist", err)
+		}
+		if _, err := fsys.Stat("z.txt"); err != nil {
+			t.Errorf("RemoveAll('a') unexpectedly removed z.txt: %v", err)
+		}
+	})
+
+	t.Run("not_exist_is_noop", func(t *testing.T) {
+		if err := fsys.RemoveAll("ghost"); err != nil {
+			t.Errorf("RemoveAll(nonexistent) = %v, want nil", err)
+		}
+	})
+
+	t.Run("root_clears_content", func(t *testing.T) {
+		fsys2 := makeMemFS(memFSPrefix)
+		defer fsys2.Close()
+		fsys2.MkdirAll("dir", fs.ModePerm)
+		h, _ := fsys2.Create("file.txt")
+		h.Close()
+
+		if err := fsys2.RemoveAll(cwdPath); err != nil {
+			t.Fatalf("RemoveAll('.') = %v, want nil", err)
+		}
+		entries, _ := fsys2.ReadDir(cwdPath)
+		if len(entries) != 0 {
+			t.Errorf("after RemoveAll('.'), FS still has %d entries", len(entries))
+		}
+	})
+}
+
+func TestMemFSRemoveClosedFS(t *testing.T) {
+	fsys, _ := newMemFS("memory://test")
+	fsys.Close()
+
+	if err := fsys.Remove("file.txt"); !errors.Is(err, fs.ErrClosed) {
+		t.Errorf("Remove on closed memFS = %v, want fs.ErrClosed", err)
+	}
+	if err := fsys.RemoveAll("dir"); !errors.Is(err, fs.ErrClosed) {
+		t.Errorf("RemoveAll on closed memFS = %v, want fs.ErrClosed", err)
+	}
+}
+
 func TestMemFSStatOpName(t *testing.T) {
 	// Stat() for an invalid path must report Op = "stat", not "lstat".
 	fsys, err := newMemFS("memory://test")

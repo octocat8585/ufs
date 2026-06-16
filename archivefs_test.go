@@ -203,6 +203,30 @@ func TestArchiveFSStatNonExistent(t *testing.T) {
 	}
 }
 
+func TestArchiveFSRemove(t *testing.T) {
+	fsys := mustArchiveFS(t)
+
+	err := fsys.Remove("index.html")
+	if err == nil {
+		t.Fatal("Remove() = nil error, want ErrPermission")
+	}
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Errorf("Remove() error = %v, want to wrap fs.ErrPermission", err)
+	}
+}
+
+func TestArchiveFSRemoveAll(t *testing.T) {
+	fsys := mustArchiveFS(t)
+
+	err := fsys.RemoveAll("assets")
+	if err == nil {
+		t.Fatal("RemoveAll() = nil error, want ErrPermission")
+	}
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Errorf("RemoveAll() error = %v, want to wrap fs.ErrPermission", err)
+	}
+}
+
 // TestArchiveFSInvalidPaths verifies that every FS operation on archiveFS
 // rejects paths that fail fs.ValidPath.
 func TestArchiveFSInvalidPaths(t *testing.T) {
@@ -226,6 +250,12 @@ func TestArchiveFSInvalidPaths(t *testing.T) {
 		}},
 		{"MkdirAll", func(fsys FS, path string) error {
 			return fsys.MkdirAll(path, fs.ModePerm)
+		}},
+		{"Remove", func(fsys FS, path string) error {
+			return fsys.Remove(path)
+		}},
+		{"RemoveAll", func(fsys FS, path string) error {
+			return fsys.RemoveAll(path)
 		}},
 		{"ReadFile", func(fsys FS, path string) error {
 			_, err := fsys.(fs.ReadFileFS).ReadFile(path)

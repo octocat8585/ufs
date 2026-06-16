@@ -15,6 +15,7 @@
 package ufs
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -135,6 +136,84 @@ func TestLocalFSReadLink(t *testing.T) {
 	if got != "target.txt" {
 		t.Errorf("ReadLink = %q, want %q", got, "target.txt")
 	}
+}
+
+func TestLocalFSRemove(t *testing.T) {
+	dir := mustTemp(t)
+	fsys, err := makeLocalFS(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fsys.Close()
+
+	// Create a file and a subdirectory with a child.
+	if err := os.WriteFile(filepath.Join(dir, "hello.txt"), []byte("hi"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "sub", "child.txt"), []byte("child"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("file_exists", func(t *testing.T) {
+		if err := fsys.Remove("hello.txt"); err != nil {
+			t.Fatalf("Remove('hello.txt') = %v, want nil", err)
+		}
+		if _, err := fsys.Stat("hello.txt"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("after Remove, Stat = %v, want ErrNotExist", err)
+		}
+	})
+
+	t.Run("non_empty_dir_fails", func(t *testing.T) {
+		if err := fsys.Remove("sub"); err == nil {
+			t.Error("Remove(non-empty dir) succeeded, want error")
+		}
+	})
+
+	t.Run("not_exist", func(t *testing.T) {
+		if err := fsys.Remove("ghost.txt"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("Remove(nonexistent) = %v, want ErrNotExist", err)
+		}
+	})
+}
+
+func TestLocalFSRemoveAll(t *testing.T) {
+	dir := mustTemp(t)
+	fsys, err := makeLocalFS(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fsys.Close()
+
+	if err := os.MkdirAll(filepath.Join(dir, "tree", "deep"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "tree", "deep", "leaf.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "keep.txt"), []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("subtree", func(t *testing.T) {
+		if err := fsys.RemoveAll("tree"); err != nil {
+			t.Fatalf("RemoveAll('tree') = %v, want nil", err)
+		}
+		if _, err := fsys.Stat("tree"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("after RemoveAll('tree'), Stat = %v, want ErrNotExist", err)
+		}
+		if _, err := fsys.Stat("keep.txt"); err != nil {
+			t.Errorf("RemoveAll('tree') unexpectedly removed keep.txt: %v", err)
+		}
+	})
+
+	t.Run("not_exist_is_noop", func(t *testing.T) {
+		if err := fsys.RemoveAll("ghost"); err != nil {
+			t.Errorf("RemoveAll(nonexistent) = %v, want nil", err)
+		}
+	})
 }
 
 func TestLocalFSReadDirDoesNotContainCwd(t *testing.T) {

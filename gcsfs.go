@@ -418,6 +418,70 @@ func (fsys *gcsFS) Lstat(name string) (fs.FileInfo, error) {
 	return f.Stat()
 }
 
+func (fsys *gcsFS) Remove(name string) error {
+	if err := validPath("remove", name); err != nil {
+		return err
+	}
+	bkt := fsys.client.Bucket(fsys.bucket)
+	objPath := path.Join(fsys.baseDir, name)
+
+	// If there are virtual-directory children, refuse (non-empty directory).
+	entries, err := fsys.listDir(name)
+	if err != nil {
+		return pathError("remove", name, err)
+	}
+	if len(entries) > 0 {
+		return pathError("remove", name, errDirNotEmpty)
+	}
+
+	if err := bkt.Object(objPath).Delete(fsys.ctx); err != nil {
+		if errors.Is(err, storage.ErrObjectNotExist) {
+			return pathError("remove", name, fs.ErrNotExist)
+		}
+		return pathError("remove", name, err)
+	}
+	return nil
+}
+
+func (fsys *gcsFS) RemoveAll(name string) error {
+	if name != cwdPath {
+		if err := validPath("removeall", name); err != nil {
+			return err
+		}
+	}
+	bkt := fsys.client.Bucket(fsys.bucket)
+
+	var listPrefix string
+	if name == cwdPath {
+		listPrefix = fsys.baseDir
+		if listPrefix != "" {
+			listPrefix += "/"
+		}
+	} else {
+		objPath := path.Join(fsys.baseDir, name)
+		// Best-effort delete of the exact object; ignore not-found.
+		if delErr := bkt.Object(objPath).Delete(fsys.ctx); delErr != nil && !errors.Is(delErr, storage.ErrObjectNotExist) {
+			return pathError("removeall", name, delErr)
+		}
+		listPrefix = objPath + "/"
+	}
+
+	it := bkt.Objects(fsys.ctx, &storage.Query{Prefix: listPrefix})
+	for {
+		attrs, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return pathError("removeall", name, err)
+		}
+		if delErr := bkt.Object(attrs.Name).Delete(fsys.ctx); delErr != nil && !errors.Is(delErr, storage.ErrObjectNotExist) {
+			return pathError("removeall", name, delErr)
+		}
+	}
+	return nil
+}
+
 func newGCSFS(ctx context.Context, name string) (*gcsFS, error) {
 	gcsClient, err := storage.NewClient(ctx)
 	if err != nil {

@@ -203,3 +203,25 @@ func list(fsys fs.FS, dir string, includeDirs bool) ([]string, error) {
 	})
 	return items, err
 }
+
+// Remove removes the file or empty directory at name in fsys.
+// If fsys implements [Remover], its Remove method is used directly.
+// Otherwise Remove returns [fs.ErrPermission] wrapped in an [fs.PathError].
+func Remove(fsys fs.FS, name string) error {
+	r, ok := fsys.(Remover)
+	if !ok {
+		return pathError("remove", name, fs.ErrPermission)
+	}
+	return r.Remove(name)
+}
+
+// RemoveAll removes name and everything beneath it in fsys.
+// If fsys implements [Remover], its RemoveAll method is used directly.
+// Otherwise RemoveAll returns [fs.ErrPermission] wrapped in an [fs.PathError].
+func RemoveAll(fsys fs.FS, name string) error {
+	r, ok := fsys.(Remover)
+	if !ok {
+		return pathError("removeall", name, fs.ErrPermission)
+	}
+	return r.RemoveAll(name)
+}

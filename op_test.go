@@ -644,3 +644,148 @@ func TestWalkNestFSRegularSubdirNotSkipped(t *testing.T) {
 	}
 }
 
+// --- Remove ---
+
+func setupRemoveFS(t *testing.T) FS {
+	t.Helper()
+	fsys, err := newMemFS("memory://test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { fsys.Close() })
+	if err := fsys.MkdirAll("dir", fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"a.txt", "dir/b.txt"} {
+		f, err := fsys.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+	}
+	return fsys
+}
+
+func TestRemove(t *testing.T) {
+	fsys := setupRemoveFS(t)
+
+	if err := Remove(fsys, "a.txt"); err != nil {
+		t.Fatalf("Remove('a.txt') = %v, want nil", err)
+	}
+	if _, err := fsys.Stat("a.txt"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("after Remove, Stat('a.txt') = %v, want ErrNotExist", err)
+	}
+}
+
+func TestRemoveNotExist(t *testing.T) {
+	fsys := setupRemoveFS(t)
+
+	err := Remove(fsys, "ghost.txt")
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("Remove(nonexistent) = %v, want ErrNotExist", err)
+	}
+}
+
+func TestRemoveNonEmptyDir(t *testing.T) {
+	fsys := setupRemoveFS(t)
+
+	err := Remove(fsys, "dir")
+	if err == nil {
+		t.Error("Remove(non-empty dir) succeeded, want error")
+	}
+}
+
+// noRemoverFS wraps an fs.FS without exposing the Remover interface, allowing
+// tests to exercise the ErrPermission fallback path in Remove/RemoveAll.
+type noRemoverFS struct{ fs.FS }
+
+func TestRemoveFallback(t *testing.T) {
+	inner, _ := newMemFS("memory://test")
+	defer inner.Close()
+
+	err := Remove(&noRemoverFS{inner}, "any.txt")
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Errorf("Remove on non-Remover FS = %v, want ErrPermission", err)
+	}
+}
+
+func TestRemoveAngry(t *testing.T) {
+	fsys := makeAngryFS(angryFSPrefix)
+	if err := Remove(fsys, "file.txt"); err == nil {
+		t.Error("Remove on angry FS succeeded, want error")
+	}
+}
+
+func TestRemoveNull(t *testing.T) {
+	fsys := mustNullFS(t)
+	if err := Remove(fsys, "file.txt"); err != nil {
+		t.Errorf("Remove on nullFS = %v, want nil", err)
+	}
+}
+
+// --- RemoveAll ---
+
+func TestRemoveAll(t *testing.T) {
+	fsys := setupRemoveFS(t)
+
+	if err := RemoveAll(fsys, "dir"); err != nil {
+		t.Fatalf("RemoveAll('dir') = %v, want nil", err)
+	}
+	files, err := ListFiles(fsys, cwdPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"a.txt"}
+	if diff := cmp.Diff(want, files); diff != "" {
+		t.Errorf("after RemoveAll('dir') files mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestRemoveAllNotExist(t *testing.T) {
+	fsys := setupRemoveFS(t)
+
+	// RemoveAll on a non-existent path must succeed (no-op).
+	if err := RemoveAll(fsys, "ghost"); err != nil {
+		t.Errorf("RemoveAll(nonexistent) = %v, want nil", err)
+	}
+}
+
+func TestRemoveAllRoot(t *testing.T) {
+	fsys := setupRemoveFS(t)
+
+	if err := RemoveAll(fsys, cwdPath); err != nil {
+		t.Fatalf("RemoveAll('.') = %v, want nil", err)
+	}
+	files, err := ListFiles(fsys, cwdPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 0 {
+		t.Errorf("after RemoveAll('.'), expected empty FS, got: %v", files)
+	}
+}
+
+func TestRemoveAllFallback(t *testing.T) {
+	inner, _ := newMemFS("memory://test")
+	defer inner.Close()
+
+	err := RemoveAll(&noRemoverFS{inner}, "dir")
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Errorf("RemoveAll on non-Remover FS = %v, want ErrPermission", err)
+	}
+}
+
+func TestRemoveAllAngry(t *testing.T) {
+	fsys := makeAngryFS(angryFSPrefix)
+	if err := RemoveAll(fsys, "dir"); err == nil {
+		t.Error("RemoveAll on angry FS succeeded, want error")
+	}
+}
+
+func TestRemoveAllNull(t *testing.T) {
+	fsys := mustNullFS(t)
+	if err := RemoveAll(fsys, "dir"); err != nil {
+		t.Errorf("RemoveAll on nullFS = %v, want nil", err)
+	}
+}
+

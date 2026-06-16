@@ -476,6 +476,28 @@ func (fsys *nestFS) Lstat(name string) (fs.FileInfo, error) {
 	return mountFS.Stat(subName)
 }
 
+func (fsys *nestFS) Remove(name string) error {
+	if err := fsys.validPath("remove", name); err != nil {
+		return err
+	}
+	mountFS, subName, err := fsys.getFSAndSubpath(name)
+	if err != nil {
+		return err
+	}
+	return mountFS.fsys.Remove(subName)
+}
+
+func (fsys *nestFS) RemoveAll(name string) error {
+	if err := fsys.validPath("removeall", name); err != nil {
+		return err
+	}
+	mountFS, subName, err := fsys.getFSAndSubpath(name)
+	if err != nil {
+		return err
+	}
+	return mountFS.fsys.RemoveAll(subName)
+}
+
 func (fsys *nestFS) Glob(pattern string) ([]string, error) {
 	if cFsys, ok := fsys.fsys.(fs.GlobFS); ok {
 		return cFsys.Glob(pattern)

@@ -91,6 +91,12 @@ func TestAngryFSOperations(t *testing.T) {
 			_, err := fsys.Stat(tc)
 			return err
 		}},
+		{"Remove", testassetFilenameList, func(fsys FS, tc string) error {
+			return fsys.Remove(tc)
+		}},
+		{"RemoveAll", append(testassetFilenameList, dirNames...), func(fsys FS, tc string) error {
+			return fsys.RemoveAll(tc)
+		}},
 	}
 
 	for _, group := range tests {
@@ -140,6 +146,20 @@ func TestAngryFSStatInvalid(t *testing.T) {
 				t.Errorf("Stat(%q) = nil error, want error", tc)
 			}
 		})
+	}
+}
+
+func TestAngryFSRemove(t *testing.T) {
+	fsys := mustAngryFS(t)
+	if err := fsys.Remove("file.txt"); !errors.Is(err, fs.ErrInvalid) {
+		t.Errorf("Remove() = %v, want %v", err, fs.ErrInvalid)
+	}
+}
+
+func TestAngryFSRemoveAll(t *testing.T) {
+	fsys := mustAngryFS(t)
+	if err := fsys.RemoveAll("dir"); !errors.Is(err, fs.ErrInvalid) {
+		t.Errorf("RemoveAll() = %v, want %v", err, fs.ErrInvalid)
 	}
 }
 
