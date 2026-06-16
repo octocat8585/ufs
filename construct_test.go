@@ -15,6 +15,8 @@
 package ufs
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -203,6 +205,122 @@ func mustGetwd(t testing.TB) string {
 		t.Fatal(err)
 	}
 	return wd
+}
+
+func TestFSBuilderBuildEmpty(t *testing.T) {
+	t.Parallel()
+	fsys, err := NewFSBuilder("").Build(t.Context())
+	if err != nil {
+		t.Fatalf("Build() = %v, want nil", err)
+	}
+	defer fsys.Close()
+	if _, ok := fsys.(*nestFS); !ok {
+		t.Errorf("Build() = %T, want *nestFS", fsys)
+	}
+}
+
+func TestFSBuilderBuildURI(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		root    string
+		mounts  map[string]string
+		wantURI string
+	}{
+		{
+			name:    "memory no mounts",
+			root:    "memory://",
+			wantURI: "memory:",
+		},
+		{
+			name:    "null no mounts",
+			root:    "null://",
+			wantURI: "null:",
+		},
+		{
+			name:  "memory with null mount",
+			root:  "memory://",
+			mounts: map[string]string{"data": "null://"},
+			wantURI: "memory:?data=null%3A",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b := NewFSBuilder(tc.root)
+			for path, uri := range tc.mounts {
+				b.Mount(path, uri)
+			}
+			got, err := b.BuildURI()
+			if err != nil {
+				t.Fatalf("BuildURI() = %v, want nil", err)
+			}
+			if got != tc.wantURI {
+				t.Errorf("BuildURI() = %q, want %q", got, tc.wantURI)
+			}
+			fsys, err := New(t.Context(), got)
+			if err != nil {
+				t.Fatalf("New(%q) = %v, want nil", got, err)
+			}
+			defer fsys.Close()
+		})
+	}
+}
+
+func TestFSBuilderBuildURIEmpty(t *testing.T) {
+	t.Parallel()
+	uri, err := NewFSBuilder("").BuildURI()
+	if err != nil {
+		t.Fatalf("BuildURI() = %v, want nil", err)
+	}
+	fsys, err := New(t.Context(), uri)
+	if err != nil {
+		t.Fatalf("New(%q) = %v, want nil", uri, err)
+	}
+	defer fsys.Close()
+}
+
+func TestFSBuilderBuildURIWithFSMountErrors(t *testing.T) {
+	t.Parallel()
+	b := NewFSBuilder("memory://").MountFS("assets", NewEmbedFS("assets", embedTestFiles))
+	_, err := b.BuildURI()
+	if err == nil {
+		t.Fatal("BuildURI() with MountFS = nil, want error")
+	}
+}
+
+func TestFSBuilderMountFS(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	embedFSys := NewEmbedFS("assets", embedTestFiles)
+	fsys, err := NewFSBuilder("memory://").MountFS("assets", embedFSys).Build(ctx)
+	if err != nil {
+		t.Fatalf("Build() = %v, want nil", err)
+	}
+	defer fsys.Close()
+
+	entries, err := fsys.ReadDir("assets/testing/testassets/files")
+	if err != nil {
+		t.Fatalf("ReadDir(assets/...) = %v, want nil", err)
+	}
+	if len(entries) == 0 {
+		t.Error("ReadDir returned empty entries under embed mount, want non-empty")
+	}
+}
+
+func TestFSBuilderMountFSWriteBlocked(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	embedFSys := NewEmbedFS("assets", embedTestFiles)
+	fsys, err := NewFSBuilder("memory://").MountFS("assets", embedFSys).Build(ctx)
+	if err != nil {
+		t.Fatalf("Build() = %v, want nil", err)
+	}
+	defer fsys.Close()
+
+	_, err = fsys.Create("assets/newfile.txt")
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Errorf("Create under embedFS mount = %v, want fs.ErrPermission", err)
+	}
 }
 
 // containsEntry reports whether name appears in the slice of DirEntry names.
