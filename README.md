@@ -1,19 +1,53 @@
 # ufs
 
-Unified File System (UFS) is a library that allows go apps to use the `fs.FS` interface to access file systems across many storage layers.
+Unified File System (UFS) is a Go library that allows apps to access multiple
+storage backends through a single fs.FS-based API. It provides a factory
+constructor (ufs.New) that dispatches to the appropriate implementation based on
+URI scheme, and a layering helper (ufs.CreateURI) for composing nested file systems.
 
 ## Features
 
-* Read-only `ReadFS`: Each file system implements Go's `fs.FS` interface with some extensions such as `Close() error` to manage the lifecycle of the access to the file system.
-* Read-write `FS`: Provides read-write support for file systems that allow it.
+* **Unified API** — All backends implement the same FS / ReadFS / File interfaces,
+  so you can swap storage without changing application code.
+* **Factory constructor** — ufs.New(ctx, uri) opens any supported backend; no
+  per-backend import needed at call site.
+* **Layering** — ufs.CreateURI() mounts additional virtual file systems at specific
+  paths inside a base FS (caching, scratch space, etc.).
+* **Cross-platform** — Tested on Linux, macOS, and Windows; includes platform-specific
+  build tags where needed.
 
 ## File Systems
 
-Storage | URI         | Implementation | Description
-------- | ----------- | -------------- | -----------
-Null    | `null://`   | nullfs.go      | Acts as `/dev/null`. Any files written to this location are forgotten. Reads always resolve to empty files. All directories are read with no contents.
-Memory  | `memory://` | memfs.go       | Stores files with virtual memory of the application. Forgotten when the application stops.
-Local   | `file://`   | localfs.go     | Local files on the hard drive. The URI specifies the mount point of the local file system. Access to files outside of the mounted directory are not allowed. This is backed by Go's `os.RootFS`.
+| Storage      | URI Prefix     | Implementation | Description                                               |
+|:-------------|:---------------|:---------------|:----------------------------------------------------------|
+| Null       | `null://`   | nullfs.go  | Acts as /dev/null. Writes discarded, reads return empty.  |
+| Memory       | `memory:`      | memfs.go       | In-memory storage; lost when the process exits.           |
+| Local        | `file:///path` | localfs.go     | Local disk, mounted at a root path via os.OpenRoot.       |
+| Google Cloud | `gs://bucket`  | gcsfs.go       | Google Cloud Storage bucket as a read-only file system.   |
+| Git          | `git://<url>`  | gitfs.go       | Reads files from a git repository (clones on first open). |
+| Archive      | `archive://`   | archivefs.go   | Reads archives (zip, tar, 7z) as read-only FSs.           |
+| Nested       | via CreateURI  | nestfs.go      | Layers one or more virtual FSs at specific mount paths    |
+|              |                |                | inside a base FS.                                         |
+
+## Public API
+
+```go
+// Open any supported file system from a URI.
+func New(ctx context.Context, name string) (FS, error)
+
+// Compose nested mounts: base FS with additional FSs at specific paths.
+func CreateURI(baseName string, nested map[string]string) (string, error)
+```
+
+### Interfaces
+
+| Interface | Content                                                   |
+|:----------|:----------------------------------------------------------|
+| ReadFile  | Read-only file; wraps fs.File                             |
+| File      | Read-write file; extends ReadFile with ReaderAt, Seek     |
+| ReadFS    | Read-only FS; adds Close, ListFilenames, ForEach iterators|
+| FS        | Read-write FS; extends ReadFS with Create, MkdirAll       |
+| FileInfo  | Name, Size, Mode, ModTime, IsDir, Type, Sys               |
 
 ## Commands
 
@@ -21,12 +55,26 @@ Local   | `file://`   | localfs.go     | Local files on the hard drive. The URI 
 # Build
 go build ./...
 
-# Test
-go test ./...
+# Test (CGO disabled)
+make test
 
-# Lint
-go fmt ./...
-go vet ./...
+# Test with race detector
+CGO_ENABLED=1 go test -race ./...
+
+# Run a single test
+go test -run TestName ./...
+
+# Lint (requires golangci-lint)
+golangci-lint run
+
+# Presubmit (lint + check)
+make presubmit
+
+# Deflake flaky tests (runs race tests 10 times)
+make test-deflake
+
+# Cross-compile all binaries
+make build
 ```
 
 ## Use ollama with Claude Code
@@ -34,3 +82,7 @@ go vet ./...
 ```bash
 ANTHROPIC_AUTH_TOKEN="ollama" ANTHROPIC_API_KEY="" ANTHROPIC_BASE_URL="http://mega:11434" claude --model qwen3.6:35b
 ```
+
+## License
+
+Apache 2.0 — see LICENSE.
