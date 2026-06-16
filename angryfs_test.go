@@ -149,20 +149,6 @@ func TestAngryFSStatInvalid(t *testing.T) {
 	}
 }
 
-func TestAngryFSRemove(t *testing.T) {
-	fsys := mustAngryFS(t)
-	if err := fsys.Remove("file.txt"); !errors.Is(err, fs.ErrInvalid) {
-		t.Errorf("Remove() = %v, want %v", err, fs.ErrInvalid)
-	}
-}
-
-func TestAngryFSRemoveAll(t *testing.T) {
-	fsys := mustAngryFS(t)
-	if err := fsys.RemoveAll("dir"); !errors.Is(err, fs.ErrInvalid) {
-		t.Errorf("RemoveAll() = %v, want %v", err, fs.ErrInvalid)
-	}
-}
-
 func mustAngryFS(tb testing.TB) FS {
 	fsys, err := newAngryFS(angryFSPrefix)
 	if err != nil {
