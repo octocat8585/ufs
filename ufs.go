@@ -48,6 +48,7 @@ package ufs
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/fs"
 )
@@ -76,9 +77,10 @@ type File interface {
 }
 
 // ReadFS is a read-only file system. In addition to the standard [fs.FS]
-// interface it requires [io.Closer] for lifecycle management and the four
-// extended read interfaces from the standard library. Callers should always
-// Close a ReadFS when they are done with it.
+// interface it requires [io.Closer] for lifecycle management, the four
+// extended read interfaces from the standard library, and [fmt.Stringer] so
+// that every implementation can describe itself. Callers should always Close
+// a ReadFS when they are done with it.
 type ReadFS interface {
 	fs.FS
 	io.Closer
@@ -86,6 +88,7 @@ type ReadFS interface {
 	fs.ReadFileFS
 	fs.ReadLinkFS
 	fs.StatFS
+	fmt.Stringer
 }
 
 // Remover is an optional interface that a file system may implement to support
