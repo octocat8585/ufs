@@ -31,18 +31,6 @@ go vet ./...
 
 ## Use ollama with Claude Code
 
-```powershell
-$Env:ANTHROPIC_AUTH_TOKEN="ollama"
-$Env:ANTHROPIC_API_KEY=""
-$Env:ANTHROPIC_BASE_URL="http://local:11434"
-
-claude --model qwen3.6:27b
-```
-
 ```bash
-export ANTHROPIC_AUTH_TOKEN="ollama"
-export ANTHROPIC_API_KEY=""
-export ANTHROPIC_BASE_URL="http://mega:11434"
-
-claude --model qwen3.6:27b
+ANTHROPIC_AUTH_TOKEN="ollama" ANTHROPIC_API_KEY="" ANTHROPIC_BASE_URL="http://mega:11434" claude --model qwen3.6:35b
 ```
