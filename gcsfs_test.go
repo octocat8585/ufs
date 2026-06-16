@@ -338,8 +338,8 @@ func TestGCSFSRemove(t *testing.T) {
 	})
 
 	t.Run("non_empty_dir", func(t *testing.T) {
-		if err := fsys.Remove("dir"); err == nil {
-			t.Error("Remove(non-empty dir) succeeded, want error")
+		if err := fsys.Remove("dir"); !errors.Is(err, errDirNotEmpty) {
+			t.Errorf("Remove(non-empty dir) = %v, want errDirNotEmpty", err)
 		}
 	})
 }
