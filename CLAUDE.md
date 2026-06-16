@@ -8,8 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build
 go build ./...
 
-# Test
-go test ./...
+# Test (CGO disabled)
+make test
 
 # Test with race detector (required for presubmit)
 CGO_ENABLED=1 go test -race ./...
@@ -20,45 +20,75 @@ go test -run TestName ./...
 # Lint (requires golangci-lint)
 golangci-lint run
 
-# Vet
-go vet ./...
-
-# Presubmit (lint + both test modes)
+# Presubmit (lint + check)
 make presubmit
+
+# Deflake tests (runs race tests 10x)
+make test-deflake
+
+# Cross-compile all binaries
+make build
 ```
 
 ## Architecture
 
-`ufs` is a Go library providing a unified virtual file system abstraction. The module is `github.com/cloudfra/ufs`.
+`ufs` is a Go library providing a unified virtual file system abstraction. The module
+is github.com/cloudfra/ufs.
 
 ### Core interfaces (`ufs.go`)
 
-- `ReadFile` — read-only file, wraps `fs.File`
-- `File` — read-write file, extends `ReadFile` with `io.ReaderAt`, `io.ReadWriteSeeker`, and `io.StringWriter`
-- `ReadFS` — read-only file system, wraps `fs.FS` and adds `io.Closer` for lifecycle management
-- `FS` — read-write file system, extends `ReadFS` with `Create(name string) (File, error)` and `MkdirAll(name string, perm fs.FileMode) error`
+| Interface  | What it wraps / adds                                                         |
+|:-----------|:-----------------------------------------------------------------------------|
+| FileInfo   | Name, Size, Mode, ModTime, IsDir, Type, Sys                                  |
+| ReadFile   | Read-only file; wraps fs.File                                                |
+| File       | Read-write; extends ReadFile with ReaderAt, Seek, StringWriter               |
+| ReadFS     | Read-only FS; adds Close, ListFilenames, ForEachIterators                    |
+| FS         | Read-write; extends ReadFS with Create, MkdirAll                             |
 
-### Implementations
+### Factory
 
-Each file system backend is a private struct in its own file implementing the `FS` interface:
+```go
+func New(ctx context.Context, name string) (FS, error)
+```
 
-| File | Type | Status | Behavior |
-|------|------|--------|----------|
-| `nullfs.go` | `nullFS` | Implemented | `/dev/null` semantics — writes are discarded, reads return empty |
-| `memfs.go` | `memFS` | Stub (TODO) | In-memory storage, lost when the process exits |
-| `localfs.go` | `localFS` | Implemented | Local disk, mounted at a root path via `os.OpenRoot` (Go 1.24+); access outside mount point is disallowed |
-| `angryfs.go` | `angryFS` | Implemented | Always returns `fs.ErrInvalid`; used to test error-handling paths |
+Dispatches to the appropriate implementation based on URI scheme:
+
+| Scheme        | Implementation   | Struct    | Type     | Status  | Behavior                                                 |
+|:--------------|:-----------------|:----------|:---------|:--------|:---------------------------------------------------------|
+| null://       | nullfs.go        | nullFS    | ro       | Impl.   | /dev/null — writes discarded, reads return empty         |
+| memory:       | memfs.go         | memFS     | rw       | Impl.   | In-memory storage; lost when process exits               |
+| file:///...   | localfs.go       | localFS   | rw       | Impl.   | Local disk via os.OpenRoot; rejects paths outside root   |
+| gs://...      | gcsfs.go         | gcsFS     | ro       | Impl.   | Google Cloud Storage bucket as a virtual FS              |
+| git://...     | gitfs.go         | --        | ro       | Impl.   | Reads from a git repo (clones on first open)             |
+| archive://    | archivefs.go     | archiveFS | ro       | Impl.   | Reads archives (zip, tar, 7z) as virtual FSs             |
+
+### Layering / nesting
+
+```go
+func CreateURI(baseName string, nested map[string]string) (string, error)
+```
+
+Creates a URI that mounts additional file systems at specific paths inside a base FS.
+The result is nestFS (nestfs.go) which dispatches reads/writes based on mount path
+prefix.
+
+A temporary local-mount wrapper (tempMountFS in tempmountfs.go) provides writable
+scratch space on top of any read-only FS for implementations that need it.
 
 ### Supporting files
 
-| File | Purpose |
-|------|---------|
-| `info.go` | `fsInfo` — concrete `fs.FileInfo` implementation |
-| `util.go` | `validPath()` — validates paths against `fs.ValidPath` before all `Open`/`Create` calls |
-| `testing_test.go` | `testFileSystem()` — shared CRUD + `fstest.TestFS` harness used by each backend's tests |
+| File                | Purpose                                                      |
+|:--------------------|:-------------------------------------------------------------|
+| info.go             | fsInfo — concrete fs.FileInfo implementation                 |
+| path.go, path_test.go | validPath — validates paths against fs.ValidPath           |
+| op.go               | High-level ops — Rsync copies files between FSes             |
+| osutil.go           | OS helpers (file download, etc.)                             |
+| testing_test.go     | Shared test harness used by each backend                     |
+| assets_test.go      | Test asset loading helpers                                   |
 
 ### Conventions
 
-- Keep structs private; expose construction via `newXxxFS(name string) (FS, error)`
-- Factory `name` arg follows a URI scheme: `null://`, `file:///abs/path` (localfs strips the `file://` prefix)
-- All path operations call `validPath()` first — returns `*fs.PathError` for invalid paths
+- Keep structs private; expose construction via the public New() factory.
+- Factory name arg follows a URI scheme: null://, file:///..., memory:, gs://..., git://..., archive://...
+- All path operations call validPath first — returns fs.PathError for invalid paths.
+- Each backend has its own file, its own tests, and runs the shared fstest.TestFS harness via testFileSystem.
