@@ -115,6 +115,56 @@ func excludeDirs(name string, d fs.DirEntry, err error) (bool, error) {
 	return false, nil
 }
 
+// archiveDirChecker is implemented by nestFS to identify virtual archive-mount
+// directories without exposing the concrete type.
+type archiveDirChecker interface {
+	isMountedArchiveDir(name string) bool
+}
+
+// WalkArgs configures traversal behaviour for [Walk].
+type WalkArgs struct {
+	// IncludeMountedArchive controls whether virtual archive-mount directories
+	// (e.g. "data.zip.d") are descended into during the walk. When false
+	// (the default), such directories are skipped entirely.
+	IncludeMountedArchive bool
+
+	// ExcludeDirectory is a list of glob patterns matched against each
+	// directory's base name using [path.Match]. Directories whose names match
+	// any pattern are skipped along with all their contents. A nil or empty
+	// slice applies no filter.
+	ExcludeDirectory []string
+}
+
+// Walk walks dir in fsys, calling f for each file whose ancestor directories
+// pass the filters in args. It differs from [ForEachFilename] in two ways:
+// virtual archive-mount directories (e.g. "data.zip.d") are skipped by default
+// (set [WalkArgs.IncludeMountedArchive] to descend into them), and directories
+// whose base names match any [WalkArgs.ExcludeDirectory] glob are skipped
+// entirely. The walk stops and returns the first non-nil error from f.
+func Walk(fsys fs.FS, dir string, args WalkArgs, f func(string) error) error {
+	adc, ok := fsys.(archiveDirChecker)
+	return fs.WalkDir(fsys, dir, func(name string, d fs.DirEntry, err error) error {
+		if isCwd(name) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if !args.IncludeMountedArchive && ok && adc.isMountedArchiveDir(name) {
+				return fs.SkipDir
+			}
+			for _, pattern := range args.ExcludeDirectory {
+				if matched, _ := path.Match(pattern, d.Name()); matched {
+					return fs.SkipDir
+				}
+			}
+			return nil
+		}
+		return f(name)
+	})
+}
+
 // List returns all paths (both files and directories) under dir in lexical
 // order. The root directory "." is never included in the result. For
 // files-only, prefer [ListFiles].

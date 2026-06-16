@@ -218,6 +218,30 @@ func (fsys *nestFS) addMount(name string, mountedFS *nestFS) error {
 	return fsys.mounts.put(name, mountedFS)
 }
 
+// isMountedArchiveDir reports whether name (a full path within this FS) is a
+// virtual directory backed by a mounted archive. It returns true only when:
+//   - name ends with archiveDirExt
+//   - the trimmed name satisfies isMountableArchivePath
+//   - the archive file is not confirmed absent; any Stat error other than
+//     ErrNotExist is treated as "file likely exists" so that a permission-denied
+//     error does not cause Walk to descend and trigger a mount failure
+//
+// Note: if a real directory named "foo.zip.d" coexists with "foo.zip" in the
+// same FS, nestFS's path routing always redirects access through the archive
+// (see getFSAndSubpath). The real directory is unreachable via this FS
+// regardless of what this method returns; that is a nestFS limitation.
+func (fsys *nestFS) isMountedArchiveDir(name string) bool {
+	if !strings.HasSuffix(name, archiveDirExt) {
+		return false
+	}
+	archiveName := strings.TrimSuffix(name, archiveDirExt)
+	if !isMountableArchivePath(archiveName) {
+		return false
+	}
+	_, err := fsys.Stat(archiveName)
+	return !errors.Is(err, fs.ErrNotExist)
+}
+
 func (fsys *nestFS) mountArchive(name string) (*nestFS, error) {
 	if maybeFS := fsys.mounts.getMount(name + archiveDirExt); maybeFS != nil {
 		return maybeFS, nil

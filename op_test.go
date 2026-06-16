@@ -15,10 +15,13 @@
 package ufs
 
 import (
+	"archive/zip"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -380,3 +383,264 @@ func TestForEachFileInfoCallbackError(t *testing.T) {
 		t.Errorf("callback called %d times, want 1", count)
 	}
 }
+
+// setupNestFSWithArchive creates a temp directory containing a regular file
+// and a zip archive with one entry, then wraps it as a nestFS for Scan tests.
+func setupNestFSWithArchive(t *testing.T) FS {
+	t.Helper()
+	dir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	zipPath := filepath.Join(dir, "data.zip")
+	zf, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(zf)
+	w, err := zw.Create("inside.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(w, "content"); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := zf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	lfs, err := newLocalFS(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nfs := makeNestFS(t.Context(), lfs)
+	t.Cleanup(func() { nfs.Close() })
+	return nfs
+}
+
+// --- Scan ---
+
+func TestWalk(t *testing.T) {
+	fsys := setupListFS(t)
+
+	var got []string
+	err := Walk(fsys, cwdPath, WalkArgs{}, func(name string) error {
+		got = append(got, name)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk() = %v, want nil", err)
+	}
+	want := []string{"a.txt", "dir/b.txt", "dir/c.txt"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Walk() mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestWalkExcludeDirectoryNil(t *testing.T) {
+	fsys := setupListFS(t)
+
+	var got []string
+	err := Walk(fsys, cwdPath, WalkArgs{ExcludeDirectory: nil}, func(name string) error {
+		got = append(got, name)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk() = %v, want nil", err)
+	}
+	want := []string{"a.txt", "dir/b.txt", "dir/c.txt"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Walk() nil ExcludeDirectory mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestWalkExcludeDirectoryExact(t *testing.T) {
+	fsys := setupListFS(t)
+
+	var got []string
+	err := Walk(fsys, cwdPath, WalkArgs{ExcludeDirectory: []string{"dir"}}, func(name string) error {
+		got = append(got, name)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk() = %v, want nil", err)
+	}
+	want := []string{"a.txt"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Walk() ExcludeDirectory exact mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestWalkExcludeDirectoryGlob(t *testing.T) {
+	fsys := setupListFS(t)
+
+	var got []string
+	err := Walk(fsys, cwdPath, WalkArgs{ExcludeDirectory: []string{"d*"}}, func(name string) error {
+		got = append(got, name)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk() = %v, want nil", err)
+	}
+	want := []string{"a.txt"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Walk() ExcludeDirectory glob mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestWalkIncludeMountedArchiveDefault(t *testing.T) {
+	nfs := setupNestFSWithArchive(t)
+
+	var got []string
+	err := Walk(nfs, cwdPath, WalkArgs{}, func(name string) error {
+		got = append(got, name)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk() = %v, want nil", err)
+	}
+	// data.zip.d is a virtual archive-mount dir and must be skipped by default.
+	want := []string{"data.zip", "readme.txt"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Walk() default (no archives) mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestWalkIncludeMountedArchive(t *testing.T) {
+	nfs := setupNestFSWithArchive(t)
+
+	var got []string
+	err := Walk(nfs, cwdPath, WalkArgs{IncludeMountedArchive: true}, func(name string) error {
+		got = append(got, name)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk() = %v, want nil", err)
+	}
+	// With IncludeMountedArchive the walk descends into data.zip.d.
+	want := []string{"data.zip", "data.zip.d/inside.txt", "readme.txt"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Walk() IncludeMountedArchive mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestWalkCallbackError(t *testing.T) {
+	fsys := setupListFS(t)
+	sentinel := errors.New("stop")
+
+	count := 0
+	err := Walk(fsys, cwdPath, WalkArgs{}, func(_ string) error {
+		count++
+		return sentinel
+	})
+	if !errors.Is(err, sentinel) {
+		t.Errorf("Walk() = %v, want sentinel error", err)
+	}
+	if count != 1 {
+		t.Errorf("callback called %d times, want 1", count)
+	}
+}
+
+// TestIsMountedArchiveDir exercises all early-exit conditions of the method.
+func TestIsMountedArchiveDir(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create data.zip (virtual .d should be detected).
+	zf, err := os.Create(filepath.Join(dir, "data.zip"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(zf)
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := zf.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// Create conf.d as a real directory (base name "conf" is not an archive).
+	if err := os.MkdirAll(filepath.Join(dir, "conf.d"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	lfs, err := newLocalFS(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nfs := makeNestFS(t.Context(), lfs)
+	t.Cleanup(func() { nfs.Close() })
+
+	cases := []struct {
+		name string
+		want bool
+	}{
+		{"readme.txt", false},  // does not end with .d
+		{"conf.d", false},      // ends with .d but "conf" is not a mountable archive name
+		{"ghost.zip.d", false}, // archive name but ghost.zip does not exist (ErrNotExist)
+		{"data.zip.d", true},   // archive exists and is not confirmed absent
+	}
+	for _, tc := range cases {
+		if got := nfs.isMountedArchiveDir(tc.name); got != tc.want {
+			t.Errorf("isMountedArchiveDir(%q) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestWalkNestFSRegularSubdirNotSkipped verifies that a real subdirectory inside
+// a nestFS is descended into even when IncludeMountedArchive is false.
+func TestWalkNestFSRegularSubdirNotSkipped(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(dir, "subdir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "subdir", "nested.txt"), []byte("nested"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	zipPath := filepath.Join(dir, "data.zip")
+	zf, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(zf)
+	w, err := zw.Create("inside.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(w, "content"); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := zf.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	lfs, err := newLocalFS(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nfs := makeNestFS(t.Context(), lfs)
+	t.Cleanup(func() { nfs.Close() })
+
+	var got []string
+	err = Walk(nfs, cwdPath, WalkArgs{}, func(name string) error {
+		got = append(got, name)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk() = %v, want nil", err)
+	}
+	// Real subdir must be descended; archive-mount dir must be skipped.
+	want := []string{"data.zip", "subdir/nested.txt"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Walk() regular subdir mismatch (-want +got):\n%s", diff)
+	}
+}
+
