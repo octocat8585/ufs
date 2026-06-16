@@ -203,6 +203,20 @@ func (fsys *nullFS) Glob(pattern string) ([]string, error) {
 	return []string{}, nil
 }
 
+func (fsys *nullFS) Remove(name string) error {
+	if err := validPath("remove", name); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (fsys *nullFS) RemoveAll(name string) error {
+	if err := validPath("removeall", name); err != nil {
+		return err
+	}
+	return nil
+}
+
 func newNullFS(name string) (FS, error) {
 	return makeNullFS(name), nil
 }

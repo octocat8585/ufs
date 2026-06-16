@@ -345,6 +345,20 @@ func TestNullFSStatInvalid(t *testing.T) {
 	}
 }
 
+func TestNullFSRemove(t *testing.T) {
+	nfs := mustNullFS(t)
+	if err := nfs.Remove("file.txt"); err != nil {
+		t.Errorf("Remove() = %v, want nil", err)
+	}
+}
+
+func TestNullFSRemoveAll(t *testing.T) {
+	nfs := mustNullFS(t)
+	if err := nfs.RemoveAll("dir"); err != nil {
+		t.Errorf("RemoveAll() = %v, want nil", err)
+	}
+}
+
 func mustNullFS(tb testing.TB) *nullFS {
 	return makeNullFS(nullFSPrefix)
 }

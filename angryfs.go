@@ -102,6 +102,20 @@ func (fsys *angryFS) Glob(pattern string) ([]string, error) {
 	return nil, errAngry
 }
 
+func (fsys *angryFS) Remove(name string) error {
+	if err := validPath("remove", name); err != nil {
+		return err
+	}
+	return pathError("remove", name, errAngry)
+}
+
+func (fsys *angryFS) RemoveAll(name string) error {
+	if err := validPath("removeall", name); err != nil {
+		return err
+	}
+	return pathError("removeall", name, errAngry)
+}
+
 func newAngryFS(name string) (FS, error) {
 	return makeAngryFS(name), nil
 }

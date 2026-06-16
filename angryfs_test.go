@@ -91,6 +91,12 @@ func TestAngryFSOperations(t *testing.T) {
 			_, err := fsys.Stat(tc)
 			return err
 		}},
+		{"Remove", testassetFilenameList, func(fsys FS, tc string) error {
+			return fsys.Remove(tc)
+		}},
+		{"RemoveAll", append(testassetFilenameList, dirNames...), func(fsys FS, tc string) error {
+			return fsys.RemoveAll(tc)
+		}},
 	}
 
 	for _, group := range tests {

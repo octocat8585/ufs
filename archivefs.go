@@ -121,6 +121,20 @@ func (fsys *archiveFS) Lstat(name string) (fs.FileInfo, error) {
 	return fsys.Stat(name)
 }
 
+func (fsys *archiveFS) Remove(name string) error {
+	if err := validPath("remove", name); err != nil {
+		return err
+	}
+	return pathError("remove", name, fmt.Errorf("archiveFS mounts are read-only, cannot remove %q, %w", name, fs.ErrPermission))
+}
+
+func (fsys *archiveFS) RemoveAll(name string) error {
+	if err := validPath("removeall", name); err != nil {
+		return err
+	}
+	return pathError("removeall", name, fmt.Errorf("archiveFS mounts are read-only, cannot remove %q, %w", name, fs.ErrPermission))
+}
+
 func newArchiveFSFromLocalFS(ctx context.Context, name string) (*archiveFS, error) {
 	fsys, err := archives.FileSystem(ctx, name, nil)
 	if err != nil {

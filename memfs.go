@@ -16,6 +16,7 @@ package ufs
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -33,9 +34,12 @@ const (
 var (
 	_ File           = (*memFile)(nil)
 	_ FS             = (*memFS)(nil)
+	_ Remover        = (*memFS)(nil)
 	_ fs.GlobFS      = (*memFS)(nil)
 	_ fs.ReadDirFile = (*memDirFile)(nil)
 )
+
+var errDirNotEmpty = errors.New("directory not empty")
 
 // memNode holds the stored state for one file or directory.
 type memNode struct {
@@ -526,6 +530,62 @@ func (fsys *memFS) Glob(pattern string) ([]string, error) {
 	}
 	sort.Strings(matches)
 	return matches, nil
+}
+
+func (fsys *memFS) Remove(name string) error {
+	if fsys.isClosed() {
+		return pathError("remove", name, fs.ErrClosed)
+	}
+	if err := validPath("remove", name); err != nil {
+		return err
+	}
+	if name == cwdPath {
+		return pathError("remove", name, fs.ErrPermission)
+	}
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+	node, ok := fsys.nodes[name]
+	if !ok {
+		return pathError("remove", name, fs.ErrNotExist)
+	}
+	if node.isDir {
+		prefix := name + "/"
+		for key := range fsys.nodes {
+			if strings.HasPrefix(key, prefix) {
+				return pathError("remove", name, errDirNotEmpty)
+			}
+		}
+	}
+	delete(fsys.nodes, name)
+	return nil
+}
+
+func (fsys *memFS) RemoveAll(name string) error {
+	if fsys.isClosed() {
+		return pathError("removeall", name, fs.ErrClosed)
+	}
+	if name == cwdPath {
+		fsys.mu.Lock()
+		defer fsys.mu.Unlock()
+		for key := range fsys.nodes {
+			if key != cwdPath {
+				delete(fsys.nodes, key)
+			}
+		}
+		return nil
+	}
+	if err := validPath("removeall", name); err != nil {
+		return err
+	}
+	fsys.mu.Lock()
+	defer fsys.mu.Unlock()
+	prefix := name + "/"
+	for key := range fsys.nodes {
+		if key == name || strings.HasPrefix(key, prefix) {
+			delete(fsys.nodes, key)
+		}
+	}
+	return nil
 }
 
 func newMemFS(name string) (FS, error) {

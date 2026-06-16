@@ -93,6 +93,24 @@ func TestInvalidPath(t *testing.T) {
 					assertInvalidPathError(t, path, err, "lstat")
 				}
 			})
+
+			t.Run(fmt.Sprintf("Remove/%s/%s", fsysTC.name, path), func(t *testing.T) {
+				t.Parallel()
+				fsys := fsysTC.createFS(t)
+				if r, ok := fsys.(Remover); ok {
+					err := r.Remove(path)
+					assertInvalidPathError(t, path, err, "remove")
+				}
+			})
+
+			t.Run(fmt.Sprintf("RemoveAll/%s/%s", fsysTC.name, path), func(t *testing.T) {
+				t.Parallel()
+				fsys := fsysTC.createFS(t)
+				if r, ok := fsys.(Remover); ok {
+					err := r.RemoveAll(path)
+					assertInvalidPathError(t, path, err, "removeall")
+				}
+			})
 		}
 	}
 }
@@ -182,6 +200,18 @@ func TestFSClose(t *testing.T) {
 			t.Run("MkdirAll", func(t *testing.T) {
 				if err := fsys.MkdirAll("a/b/c", fs.ModePerm); !errors.Is(err, fs.ErrClosed) {
 					t.Errorf("MkdirAll('a/b/c') did not return fs.ErrClosed, got: %s", err)
+				}
+			})
+
+			t.Run("Remove", func(t *testing.T) {
+				if err := fsys.Remove("file.txt"); !errors.Is(err, fs.ErrClosed) {
+					t.Errorf("Remove('file.txt') did not return fs.ErrClosed, got: %s", err)
+				}
+			})
+
+			t.Run("RemoveAll", func(t *testing.T) {
+				if err := fsys.RemoveAll("dir"); !errors.Is(err, fs.ErrClosed) {
+					t.Errorf("RemoveAll('dir') did not return fs.ErrClosed, got: %s", err)
 				}
 			})
 

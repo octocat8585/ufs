@@ -87,6 +87,75 @@ func TestTempMountFSPrepareError(t *testing.T) {
 	}
 }
 
+func TestTempMountFSRemove(t *testing.T) {
+	fsys, err := newTempMountFS("test://", func(string) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fsys.Close()
+
+	f, err := fsys.Create("remove_me.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	t.Run("file_exists", func(t *testing.T) {
+		if err := fsys.Remove("remove_me.txt"); err != nil {
+			t.Fatalf("Remove() = %v, want nil", err)
+		}
+		if _, err := fsys.Stat("remove_me.txt"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("after Remove, Stat = %v, want ErrNotExist", err)
+		}
+	})
+
+	t.Run("not_exist", func(t *testing.T) {
+		if err := fsys.Remove("ghost.txt"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("Remove(nonexistent) = %v, want ErrNotExist", err)
+		}
+	})
+}
+
+func TestTempMountFSRemoveAll(t *testing.T) {
+	fsys, err := newTempMountFS("test://", func(string) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fsys.Close()
+
+	if err := fsys.MkdirAll("sub/dir", fs.ModePerm); err != nil {
+		t.Fatal(err)
+	}
+	child, err := fsys.Create("sub/dir/leaf.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	child.Close()
+	keep, err := fsys.Create("keep.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keep.Close()
+
+	t.Run("subtree", func(t *testing.T) {
+		if err := fsys.RemoveAll("sub"); err != nil {
+			t.Fatalf("RemoveAll('sub') = %v, want nil", err)
+		}
+		if _, err := fsys.Stat("sub"); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("after RemoveAll('sub'), Stat = %v, want ErrNotExist", err)
+		}
+		if _, err := fsys.Stat("keep.txt"); err != nil {
+			t.Errorf("RemoveAll('sub') unexpectedly removed keep.txt: %v", err)
+		}
+	})
+
+	t.Run("not_exist_is_noop", func(t *testing.T) {
+		if err := fsys.RemoveAll("ghost"); err != nil {
+			t.Errorf("RemoveAll(nonexistent) = %v, want nil", err)
+		}
+	})
+}
+
 func TestTempMountFSReadLink(t *testing.T) {
 	skipTestOnWindows(t)
 	var tempDir string

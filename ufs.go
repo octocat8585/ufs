@@ -87,10 +87,25 @@ type ReadFS interface {
 	fs.StatFS
 }
 
-// FS is a read-write file system. It extends [ReadFS] with file creation and
-// directory creation.
+// Remover is an optional interface that a file system may implement to support
+// file and directory deletion. It is embedded in [FS], so every writable
+// backend must implement it.
+type Remover interface {
+	// Remove deletes the file or empty directory at name. It returns an error
+	// wrapping [fs.ErrNotExist] if name does not exist, or an error if name is
+	// a non-empty directory. Removing the root (".") returns [fs.ErrPermission].
+	Remove(name string) error
+
+	// RemoveAll removes name and all contents beneath it. It is a no-op (returns
+	// nil) if name does not exist.
+	RemoveAll(name string) error
+}
+
+// FS is a read-write file system. It extends [ReadFS] with file creation,
+// directory creation, and deletion.
 type FS interface {
 	ReadFS
+	Remover
 
 	// Create opens a new writable file at name, replacing any existing file at
 	// that path. Parent directories are not created automatically; call
