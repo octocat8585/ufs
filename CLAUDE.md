@@ -44,6 +44,7 @@ is github.com/cloudfra/ufs.
 | File       | Read-write; extends ReadFile with ReaderAt, Seek, StringWriter               |
 | ReadFS     | Read-only FS; adds Close, ListFilenames, ForEachIterators                    |
 | FS         | Read-write; extends ReadFS with Create, MkdirAll                             |
+| Watcher    | Optional; recursive directory change notifications via Watch                  |
 
 ### Factory
 
@@ -83,6 +84,7 @@ scratch space on top of any read-only FS for implementations that need it.
 | path.go, path_test.go | validPath — validates paths against fs.ValidPath           |
 | op.go               | High-level ops — Rsync copies files between FSes             |
 | osutil.go           | OS helpers (file download, etc.)                             |
+| localfs_notify.go   | Watcher impl for localFS — recursive fsnotify with path translation |
 | testing_test.go     | Shared test harness used by each backend                     |
 | assets_test.go      | Test asset loading helpers                                   |
 

@@ -47,6 +47,7 @@
 package ufs
 
 import (
+	"context"
 	"io"
 	"io/fs"
 )
@@ -149,4 +150,38 @@ type ForEachFilenameIter interface {
 	// ForEachFilename calls f for each file path (not directory) under dir. If f
 	// returns a non-nil error the walk stops and that error is returned.
 	ForEachFilename(dir string, f func(string) error) error
+}
+
+// NotifyOp describes the kind of change observed on a path.
+type NotifyOp int
+
+const (
+	// NotifyCreate indicates a file or directory was created.
+	NotifyCreate NotifyOp = iota
+	// NotifyWrite indicates a file was written to.
+	NotifyWrite
+	// NotifyRemove indicates a file or directory was removed.
+	NotifyRemove
+	// NotifyRename indicates a file or directory was renamed.
+	NotifyRename
+	// NotifyChmod indicates permissions or attributes changed.
+	NotifyChmod
+)
+
+// NotifyHook is invoked for each change observed by a [Watcher]. The path
+// argument is root-relative, forward-slash separated, and satisfies
+// [fs.ValidPath] — it is never an OS-native or absolute path.
+type NotifyHook func(op NotifyOp, path string)
+
+// Watcher is an optional interface implemented by file systems that can
+// deliver recursive change notifications for a directory subtree.
+type Watcher interface {
+	// Watch begins watching name (a directory) and all nested directories,
+	// invoking hook for each observed change. Watching stops when ctx is
+	// cancelled or the returned [io.Closer] is closed, whichever comes first.
+	// Closing is idempotent and must terminate all background goroutines.
+	//
+	// The hook is called serially from a single background goroutine; it
+	// should not block for long.
+	Watch(ctx context.Context, name string, hook NotifyHook) (io.Closer, error)
 }
