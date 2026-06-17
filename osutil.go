@@ -15,34 +15,157 @@
 package ufs
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 )
 
-func downloadFile(dir string, uri string) (string, error) {
-	resp, err := http.Get(uri)
+const maxDownloadSize = 4 << 30 // 4 GiB
+
+func newHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 10 * time.Minute,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+				Control:   dialControl,
+			}).DialContext,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			return validateDownloadURL(req.Context(), req.URL)
+		},
+	}
+}
+
+// dialControl is called after DNS resolution but before the TCP connection is
+// established. It rejects connections to private/loopback IPs, defeating DNS
+// rebinding attacks where a hostname resolves to a public IP during
+// pre-validation but to a private IP at actual connect time.
+func dialControl(network, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return fmt.Errorf("invalid dial address %q: %w", address, err)
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return fmt.Errorf("invalid IP in dial address %q", address)
+	}
+	if isBlockedIP(ip) {
+		return fmt.Errorf("connection to private/loopback address %s is not allowed", ip)
+	}
+	return nil
+}
+
+func validateDownloadURL(ctx context.Context, u *url.URL) error {
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return fmt.Errorf("unsupported scheme %q, only http and https are allowed", u.Scheme)
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("empty hostname in URL %q", u.Redacted())
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if isBlockedIP(ip) {
+			return fmt.Errorf("download from private/loopback address %s is not allowed", ip)
+		}
+		return nil
+	}
+	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return fmt.Errorf("cannot resolve host %q: %w", host, err)
+	}
+	for _, addr := range ips {
+		if isBlockedIP(addr.IP) {
+			return fmt.Errorf("host %q resolves to private/loopback address %s", host, addr.IP)
+		}
+	}
+	return nil
+}
+
+func isBlockedIP(ip net.IP) bool {
+	return ip.IsLoopback() ||
+		ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsUnspecified()
+}
+
+func sanitizeFilename(rawURL *url.URL) (string, error) {
+	p := rawURL.Path
+	parts := strings.Split(p, "/")
+	filename := parts[len(parts)-1]
+	filename = strings.TrimSpace(filename)
+	if filename == "" || filename == "." || filename == ".." {
+		return "", fmt.Errorf("invalid filename %q derived from URL %q", filename, rawURL.Redacted())
+	}
+	filename = filepath.Base(filename)
+	if filename == "" || filename == "." || filename == ".." || strings.ContainsAny(filename, `/\`) {
+		return "", fmt.Errorf("invalid filename %q derived from URL %q", filename, rawURL.Redacted())
+	}
+	return filename, nil
+}
+
+func downloadFile(ctx context.Context, dir string, uri string) (string, error) {
+	return downloadFileWith(ctx, nil, dir, uri)
+}
+
+// downloadFileWith downloads the file at uri into dir. If client is nil, a
+// new SSRF-hardened client is created and the URL is pre-validated against
+// private/loopback addresses. When a non-nil client is supplied (tests), the
+// pre-flight validation is skipped because the caller owns transport security.
+func downloadFileWith(ctx context.Context, client *http.Client, dir string, uri string) (string, error) {
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return "", fmt.Errorf("invalid download URL: %w", err)
+	}
+	if client == nil {
+		if err := validateDownloadURL(ctx, parsed); err != nil {
+			return "", err
+		}
+		client = newHTTPClient()
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
-	parts := strings.Split(resp.Request.URL.Path, "/")
-	filename := parts[len(parts)-1]
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return "", fmt.Errorf("download %q failed with status %d", uri, resp.StatusCode)
+	}
+
+	filename, err := sanitizeFilename(resp.Request.URL)
+	if err != nil {
+		return "", err
+	}
 	archiveFilename := filepath.Join(dir, filename)
 
 	f, err := os.Create(archiveFilename)
 	if err != nil {
-		return archiveFilename, err
+		return "", err
 	}
 	defer f.Close()
 
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		return archiveFilename, err
+	if _, err := io.Copy(f, io.LimitReader(resp.Body, maxDownloadSize)); err != nil {
+		return "", err
 	}
 
 	return archiveFilename, nil

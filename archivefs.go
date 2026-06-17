@@ -173,7 +173,7 @@ func newTempMountRemoteArchiveFS(ctx context.Context, name string) (FS, error) {
 		return nil, fmt.Errorf("cannot create temp directory, %w", err)
 	}
 
-	filename, err := downloadFile(tempDir, name)
+	filename, err := downloadFile(ctx, tempDir, name)
 	if err != nil {
 		cleanup()
 		return nil, err
