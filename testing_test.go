@@ -105,6 +105,22 @@ var (
 		},
 	}
 
+	// permDeniedFSTestCaseList holds FSes whose write operations return
+	// fs.ErrPermission rather than succeeding silently.
+	permDeniedFSTestCaseList = []fsTestCase{
+		{
+			name: "readOnlyFS",
+			createFS: func(tb testing.TB) FS {
+				inner := makeNullFS(nullFSPrefix)
+				tb.Cleanup(func() {
+					inner.Close()
+				})
+				return ReadOnly(inner)
+			},
+			wantString: nullFSPrefix,
+		},
+	}
+
 	testassetFilenameList = []string{
 		cwdPath,
 		"files/index.html",
@@ -340,7 +356,7 @@ func verifyFS(t *testing.T, fsys FS) {
 func TestReadOnlyFS(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range append(readWriteFSTestCaseList, readOnlyFSTestCaseList...) {
+	for _, tc := range append(append(readWriteFSTestCaseList, readOnlyFSTestCaseList...), permDeniedFSTestCaseList...) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			fsys := tc.createFS(t)
