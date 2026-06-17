@@ -121,7 +121,7 @@ type archiveDirChecker interface {
 	isMountedArchiveDir(name string) bool
 }
 
-// WalkArgs configures traversal behaviour for [Walk].
+// WalkArgs configures traversal behavior for [Walk].
 type WalkArgs struct {
 	// IncludeMountedArchive controls whether virtual archive-mount directories
 	// (e.g. "data.zip.d") are descended into during the walk. When false

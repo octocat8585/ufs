@@ -110,18 +110,18 @@ func nameToURI(name string) (*url.URL, error) {
 //   - gs://bucket/prefix — Google Cloud Storage bucket, optionally scoped to a
 //     prefix. Credentials are resolved via ADC; unauthenticated access is tried
 //     as a fallback.
-//   - https:// or http:// URL ending in a recognised archive extension — the
+//   - https:// or http:// URL ending in a recognized archive extension — the
 //     archive is downloaded to a temporary directory, mounted read-only, and the
 //     temporary directory is removed when Close is called.
 //   - A path ending in .git — the repository is shallow-cloned into a temporary
 //     directory (not available on AIX).
-//   - A local path pointing to a recognised archive (.zip, .tar, .tar.gz, etc.)
+//   - A local path pointing to a recognized archive (.zip, .tar, .tar.gz, etc.)
 //     is mounted read-only through the archive's contents.
 //
 // # Nested mounts and archive auto-mounting
 //
 // The returned FS wraps all backends in a nestFS layer. When a directory entry
-// named foo.zip (or any recognised archive extension) exists, the virtual path
+// named foo.zip (or any recognized archive extension) exists, the virtual path
 // foo.zip.d is automatically exposed as a read-only mount of that archive's
 // contents. No explicit configuration is required.
 //
@@ -186,7 +186,7 @@ func (b *FSBuilder) Mount(path, uri string) *FSBuilder {
 }
 
 // MountFS adds a pre-built [FS] as a mount at path. It returns the builder
-// for chaining. Pre-built mounts cannot be serialised by [FSBuilder.BuildURI].
+// for chaining. Pre-built mounts cannot be serialized by [FSBuilder.BuildURI].
 func (b *FSBuilder) MountFS(path string, fsys FS) *FSBuilder {
 	b.mounts = append(b.mounts, fsBuildMount{path: path, fsys: fsys})
 	return b
@@ -231,7 +231,7 @@ func (b *FSBuilder) BuildURI() (string, error) {
 	nested := make(map[string]string, len(b.mounts))
 	for _, m := range b.mounts {
 		if m.fsys != nil {
-			return "", fmt.Errorf("mount %q uses a pre-built FS and cannot be serialised to a URI", m.path)
+			return "", fmt.Errorf("mount %q uses a pre-built FS and cannot be serialized to a URI", m.path)
 		}
 		nested[m.path] = m.uri
 	}
