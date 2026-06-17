@@ -1036,7 +1036,7 @@ func TestWrapFSFile(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests for the buffer polyfill behaviour (Seek / ReadAt / Read consistency)
+// Tests for the buffer polyfill behavior (Seek / ReadAt / Read consistency)
 // ---------------------------------------------------------------------------
 
 func TestNestFilePolyfillBuffering(t *testing.T) {

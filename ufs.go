@@ -178,7 +178,7 @@ type NotifyHook func(op NotifyOp, path string)
 type Watcher interface {
 	// Watch begins watching name (a directory) and all nested directories,
 	// invoking hook for each observed change. Watching stops when ctx is
-	// cancelled or the returned [io.Closer] is closed, whichever comes first.
+	// canceled or the returned [io.Closer] is closed, whichever comes first.
 	// Closing is idempotent and must terminate all background goroutines.
 	//
 	// The hook is called serially from a single background goroutine; it

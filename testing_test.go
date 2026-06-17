@@ -345,7 +345,7 @@ func TestReadOnlyFS(t *testing.T) {
 			t.Parallel()
 			fsys := tc.createFS(t)
 			if fsys == nil {
-				t.Fatalf("file sytem is nil")
+				t.Fatalf("file system is nil")
 			}
 			defer func() {
 				if err := fsys.Close(); err != nil {
@@ -368,7 +368,7 @@ func TestFS(t *testing.T) {
 			t.Parallel()
 			fsys := tc.createFS(t)
 			if fsys == nil {
-				t.Fatalf("file sytem is nil")
+				t.Fatalf("file system is nil")
 			}
 			defer func() {
 				if err := fsys.Close(); err != nil {
