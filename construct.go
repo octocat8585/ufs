@@ -17,6 +17,7 @@ package ufs
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -128,23 +129,26 @@ func nameToURI(name string) (*url.URL, error) {
 func New(ctx context.Context, name string) (FS, error) {
 	u, err := url.Parse(name)
 	if err == nil {
-		bFS, err := newBaseFS(ctx, u.Scheme+"://"+u.Path)
+		nFS, err := openNestFS(ctx, u.Scheme+"://"+u.Path)
 		if err == nil {
-			nFS := makeNestFS(ctx, bFS)
-			vals := u.Query()
-			for mountPath, mountURI := range vals {
-				mountFS, err := newBaseFS(ctx, mountURI[0])
+			for mountPath, mountURI := range u.Query() {
+				mountFS, err := openNestFS(ctx, mountURI[0])
 				if err != nil {
 					return nil, err
 				}
-				if err := nFS.addMount(mountPath, makeNestFS(ctx, mountFS)); err != nil {
+				if err := nFS.addMount(mountPath, mountFS); err != nil {
 					return nil, err
 				}
 			}
 			return nFS, nil
 		}
 	}
+	return openNestFS(ctx, name)
+}
 
+// openNestFS opens name via newBaseFS and wraps the result in a nestFS layer.
+// It returns the concrete *nestFS so callers can add mounts via addMount.
+func openNestFS(ctx context.Context, name string) (*nestFS, error) {
 	fsys, err := newBaseFS(ctx, name)
 	if err != nil {
 		return nil, err
@@ -152,7 +156,92 @@ func New(ctx context.Context, name string) (FS, error) {
 	return makeNestFS(ctx, fsys), nil
 }
 
+// FSBuilder composes an [FS] from a root URI and a set of mounts that may be
+// specified as URI strings or as pre-built [FS] instances (e.g. [NewEmbedFS]).
+// Call [NewFSBuilder] to create one, chain [FSBuilder.Mount] /
+// [FSBuilder.MountFS] to add mounts, then call [FSBuilder.Build] or
+// [FSBuilder.BuildURI].
+type FSBuilder struct {
+	name   string
+	mounts []fsBuildMount
+}
+
+type fsBuildMount struct {
+	path string
+	uri  string // non-empty for URI mounts
+	fsys FS     // non-nil for FS mounts
+}
+
+// NewFSBuilder creates a builder rooted at the given URI string. An empty
+// string is treated as "null://" (a FS that discards all writes and returns
+// empty content on reads). To use a pre-parsed [*url.URL], pass u.String().
+func NewFSBuilder(name string) *FSBuilder {
+	return &FSBuilder{name: name}
+}
+
+// Mount adds a URI-based mount at path. It returns the builder for chaining.
+func (b *FSBuilder) Mount(path, uri string) *FSBuilder {
+	b.mounts = append(b.mounts, fsBuildMount{path: path, uri: uri})
+	return b
+}
+
+// MountFS adds a pre-built [FS] as a mount at path. It returns the builder
+// for chaining. Pre-built mounts cannot be serialised by [FSBuilder.BuildURI].
+func (b *FSBuilder) MountFS(path string, fsys FS) *FSBuilder {
+	b.mounts = append(b.mounts, fsBuildMount{path: path, fsys: fsys})
+	return b
+}
+
+// Build constructs the [FS], opening the root URI and applying all configured
+// mounts. The caller must Close the returned FS when done.
+func (b *FSBuilder) Build(ctx context.Context) (FS, error) {
+	rootName := b.name
+	if rootName == "" {
+		rootName = nullFSPrefix
+	}
+	nFS, err := openNestFS(ctx, rootName)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range b.mounts {
+		var mountFS *nestFS
+		if m.fsys != nil {
+			mountFS = makeNestFS(ctx, m.fsys)
+		} else {
+			mountFS, err = openNestFS(ctx, m.uri)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if err := nFS.addMount(m.path, mountFS); err != nil {
+			return nil, err
+		}
+	}
+	return nFS, nil
+}
+
+// BuildURI serialises the builder to a URI string accepted by [New]. It
+// returns an error if any mount was added via [FSBuilder.MountFS], because
+// pre-built [FS] instances have no URI representation.
+func (b *FSBuilder) BuildURI() (string, error) {
+	rootName := b.name
+	if rootName == "" {
+		rootName = nullFSPrefix
+	}
+	nested := make(map[string]string, len(b.mounts))
+	for _, m := range b.mounts {
+		if m.fsys != nil {
+			return "", fmt.Errorf("mount %q uses a pre-built FS and cannot be serialised to a URI", m.path)
+		}
+		nested[m.path] = m.uri
+	}
+	return CreateURI(rootName, nested)
+}
+
 func newBaseFS(ctx context.Context, name string) (FS, error) {
+	if strings.HasPrefix(name, embedFSPrefix) {
+		return nil, pathError("mount", name, fmt.Errorf("embed:// file systems must be created with NewEmbedFS, not New(): %w", fs.ErrInvalid))
+	}
 	if isMemFSUri(name) {
 		return newMemFS(name)
 	}
