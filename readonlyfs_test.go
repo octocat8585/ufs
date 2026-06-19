@@ -17,6 +17,7 @@ package ufs
 import (
 	"errors"
 	"io/fs"
+	"strings"
 	"testing"
 )
 
@@ -97,7 +98,7 @@ func TestReadOnlyString(t *testing.T) {
 	inner := makeNullFS(nullFSPrefix)
 	fsys := ReadOnly(inner)
 
-	if got := fsys.String(); got != nullFSPrefix {
-		t.Errorf("String() = %q, want %q", got, nullFSPrefix)
+	if got := fsys.String(); !strings.Contains(got, nullFSPrefix) {
+		t.Errorf("String() should contain %q, got: %q", nullFSPrefix, got)
 	}
 }

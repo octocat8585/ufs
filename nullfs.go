@@ -16,8 +16,10 @@ package ufs
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"path"
 	"strings"
 )
@@ -117,8 +119,16 @@ type nullFS struct {
 	name string
 }
 
+func (fsys *nullFS) URI() *url.URL {
+	u, _ := url.Parse(fsys.name)
+	v := u.Query()
+	v.Set("ro", "true")
+	u.RawQuery = v.Encode()
+	return u
+}
+
 func (fsys *nullFS) String() string {
-	return fsys.name
+	return fmt.Sprintf("nullFS(%s)", fsys.URI())
 }
 
 func (fsys *nullFS) Open(name string) (fs.File, error) {

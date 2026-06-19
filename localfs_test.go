@@ -32,8 +32,8 @@ func TestLocalFSString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := fsys.String(); !strings.HasSuffix(got, testLocalFSName) {
-		t.Errorf("String() should end with %q, got: %q", testLocalFSName, got)
+	if got := fsys.String(); !strings.Contains(got, testLocalFSName) {
+		t.Errorf("String() should contain %q, got: %q", testLocalFSName, got)
 	}
 }
 

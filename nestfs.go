@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
 	"path"
 	"slices"
@@ -188,8 +189,41 @@ type nestFS struct {
 	args   FSArgs
 }
 
+func (fsys *nestFS) URI() *url.URL {
+	base := fsys.fsys.URI()
+	if base == nil {
+		return nil
+	}
+	u := *base
+	vals := u.Query()
+	fsys.mounts.mu.RLock()
+	defer fsys.mounts.mu.RUnlock()
+	for p, mfs := range fsys.mounts.m {
+		if strings.HasSuffix(p, archiveDirExt) {
+			continue
+		}
+		if mu := mfs.URI(); mu != nil {
+			vals.Set(p, mu.String())
+		}
+	}
+	u.RawQuery = vals.Encode()
+	return &u
+}
+
 func (fsys *nestFS) String() string {
-	return fmt.Sprintf("nestFS(%s)", fsys.fsys.String())
+	var b bytes.Buffer
+	fmt.Fprintf(&b, "nestFS(%s)", fsys.fsys.String())
+	fsys.mounts.mu.RLock()
+	defer fsys.mounts.mu.RUnlock()
+	mountPaths := make([]string, 0, len(fsys.mounts.m))
+	for p := range fsys.mounts.m {
+		mountPaths = append(mountPaths, p)
+	}
+	sort.Strings(mountPaths)
+	for _, p := range mountPaths {
+		fmt.Fprintf(&b, "\n  %s -> %s", p, fsys.mounts.m[p].String())
+	}
+	return b.String()
 }
 
 func (fsys *nestFS) appendDirEntry(name string, entries []fs.DirEntry, err error) ([]fs.DirEntry, error) {

@@ -62,7 +62,7 @@ var (
 				})
 				return fsys
 			},
-			wantString: osTempDir(),
+			wantString: "file://" + osTempDir(),
 		},
 		{
 			name: "tempMountFS",
@@ -76,7 +76,7 @@ var (
 				})
 				return fsys
 			},
-			wantString: osTempDir(),
+			wantString: "test:",
 		},
 		{
 			name: "memFS",

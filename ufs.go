@@ -51,6 +51,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 )
 
 // FileInfo provides file metadata. It currently mirrors [fs.FileInfo] and is
@@ -88,7 +89,24 @@ type ReadFS interface {
 	fs.ReadFileFS
 	fs.ReadLinkFS
 	fs.StatFS
+
 	fmt.Stringer
+
+	// URI returns the [*url.URL] that identifies this file system. The
+	// returned URL can be passed (via its String method) to [New] to
+	// reconstruct an equivalent file system. Wrappers such as nestFS merge
+	// mount information into the query string so the full composition is
+	// captured.
+	//
+	// Read-only backends include the query parameter ro=true.
+	//
+	// Implementations that have no meaningful URI (e.g. [FromFS]) return nil.
+	URI() *url.URL
+
+	// String returns a human-readable description of the file system that
+	// shows how it is composed — wrapper layers, mount points, and the
+	// underlying storage backends. It is intended for debugging and logging.
+	String() string
 }
 
 // Remover is an optional interface that a file system may implement to support
@@ -121,10 +139,6 @@ type FS interface {
 	// exists. Backends that do not have a real directory concept (e.g. GCS) treat
 	// this as a no-op.
 	MkdirAll(name string, perm fs.FileMode) error
-
-	// String returns a human-readable description of the file system, typically
-	// the URI or absolute path that was used to open it.
-	String() string
 }
 
 // ListFilenames is an optional interface that a file system may implement to

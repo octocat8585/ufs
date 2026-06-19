@@ -18,12 +18,17 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 )
 
 var _ ReadFS = (*readWrapFS)(nil)
 
 type readWrapFS struct {
 	fsys fs.FS
+}
+
+func (s *readWrapFS) URI() *url.URL {
+	return nil
 }
 
 func (s *readWrapFS) String() string {

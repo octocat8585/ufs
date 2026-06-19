@@ -18,6 +18,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"net/url"
 )
 
 const embedFSPrefix = "embed://"
@@ -29,8 +30,12 @@ type embedFS struct {
 	fsys embed.FS
 }
 
+func (fsys *embedFS) URI() *url.URL {
+	return &url.URL{Scheme: "embed", Path: "/" + fsys.name, RawQuery: "ro=true"}
+}
+
 func (fsys *embedFS) String() string {
-	return embedFSPrefix + fsys.name
+	return fmt.Sprintf("embedFS(%s)", fsys.URI())
 }
 
 func (fsys *embedFS) Open(name string) (fs.File, error) {

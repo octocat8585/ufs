@@ -15,7 +15,9 @@
 package ufs
 
 import (
+	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -41,8 +43,12 @@ type localFS struct {
 	osFS *os.Root
 }
 
+func (fsys *localFS) URI() *url.URL {
+	return &url.URL{Scheme: "file", Path: coerceUnix(fsys.osFS.Name())}
+}
+
 func (fsys *localFS) String() string {
-	return coerceUnix(fsys.osFS.Name())
+	return fmt.Sprintf("localFS(%s)", fsys.URI())
 }
 
 func (fsys *localFS) getAbsPath(name string) (string, error) {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"path"
 	"path/filepath"
 	"sort"
@@ -190,8 +191,17 @@ func (f *gcsFile) Readdir(n int) ([]fs.FileInfo, error) {
 	return infos, nil
 }
 
+func (fsys *gcsFS) URI() *url.URL {
+	return &url.URL{
+		Scheme:   "gs",
+		Host:     fsys.bucket,
+		Path:     "/" + fsys.baseDir,
+		RawQuery: "ro=true",
+	}
+}
+
 func (fsys *gcsFS) String() string {
-	return fmt.Sprintf("gs://%s/%s", fsys.bucket, fsys.baseDir)
+	return fmt.Sprintf("gcsFS(%s)", fsys.URI())
 }
 
 func (fsys *gcsFS) Open(name string) (fs.File, error) {

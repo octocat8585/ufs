@@ -27,7 +27,11 @@ import (
 // "/C:/path" form (left after stripping "file://" from "file:///C:/path") to
 // the Windows-native "C:\path" form required by filepath.Abs.
 func localFSNormalizePath(name string) string {
-	name = strings.TrimPrefix(name, "file://")
+	if after, ok := strings.CutPrefix(name, "file://"); ok {
+		name = after
+	} else {
+		name = strings.TrimPrefix(name, "file:")
+	}
 	// "/C:/path/..." → "C:\path\..." (strip leading slash, convert separators)
 	if len(name) >= 3 && name[0] == '/' && name[2] == ':' {
 		name = filepath.FromSlash(name[1:])

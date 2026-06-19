@@ -18,13 +18,15 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"strings"
 
 	"github.com/mholt/archives"
 )
 
 const (
-	archiveDirExt = ".d"
+	archiveDirExt   = ".d"
+	archiveFSPrefix = "archive:"
 )
 
 var (
@@ -32,6 +34,10 @@ var (
 
 	archiveExtList = []string{".tar", ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.lz4", ".tar.br", ".tar.zst", ".rar", ".zip", ".7z"}
 )
+
+func isArchiveFSUri(name string) bool {
+	return strings.HasPrefix(name, archiveFSPrefix)
+}
 
 func isMountableArchivePath(name string) bool {
 	lowerPath := strings.ToLower(name)
@@ -48,8 +54,16 @@ type archiveFS struct {
 	name string
 }
 
+func (fsys *archiveFS) URI() *url.URL {
+	p := fsys.name
+	if len(p) > 0 && p[0] != '/' {
+		p = "/" + p
+	}
+	return &url.URL{Scheme: "archive", Path: p, RawQuery: "ro=true"}
+}
+
 func (fsys *archiveFS) String() string {
-	return fsys.name
+	return fmt.Sprintf("archiveFS(%s)", fsys.URI())
 }
 
 func (fsys *archiveFS) Open(name string) (fs.File, error) {
@@ -184,5 +198,5 @@ func newTempMountRemoteArchiveFS(ctx context.Context, name string) (FS, error) {
 		cleanup()
 		return nil, err
 	}
-	return makeTempMountFS(fsys, tempDir, cleanup), nil
+	return makeTempMountFS(fsys, name, tempDir, cleanup), nil
 }

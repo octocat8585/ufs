@@ -19,6 +19,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -33,19 +34,22 @@ func makeTestEmbedFS(t *testing.T, name string) FS {
 	return fsys
 }
 
-func TestNewEmbedFSString(t *testing.T) {
+func TestNewEmbedFSURI(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		name string
-		want string
+		name    string
+		wantURI string
 	}{
-		{"", "embed://"},
-		{"assets", "embed://assets"},
-		{"data/files", "embed://data/files"},
+		{"", "embed:///?ro=true"},
+		{"assets", "embed:///assets?ro=true"},
+		{"data/files", "embed:///data/files?ro=true"},
 	} {
 		fsys := NewEmbedFS(tc.name, embedTestFiles)
-		if got := fsys.String(); got != tc.want {
-			t.Errorf("NewEmbedFS(%q).String() = %q, want %q", tc.name, got, tc.want)
+		if got := fsys.URI().String(); got != tc.wantURI {
+			t.Errorf("NewEmbedFS(%q).URI() = %q, want %q", tc.name, got, tc.wantURI)
+		}
+		if got := fsys.String(); !strings.Contains(got, "embedFS(") {
+			t.Errorf("NewEmbedFS(%q).String() = %q, want embedFS(...) wrapper", tc.name, got)
 		}
 		fsys.Close()
 	}

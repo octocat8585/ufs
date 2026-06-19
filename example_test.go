@@ -200,8 +200,8 @@ func ExampleCreateURI() {
 		log.Fatal(err)
 	}
 	defer fsys.Close()
-	fmt.Println(fsys.String())
+	fmt.Println(fsys.URI())
 	// Output:
 	// memory:
-	// nestFS(memory://)
+	// memory:
 }
