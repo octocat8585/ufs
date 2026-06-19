@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"sync"
 	"testing"
 
@@ -1036,25 +1037,65 @@ func TestWrapFSFile(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests for the buffer polyfill behavior (Seek / ReadAt / Read consistency)
+// Tests for wrapFile (unified wrapper)
 // ---------------------------------------------------------------------------
 
-func TestNestFilePolyfillBuffering(t *testing.T) {
-	t.Run("buffer_created_when_seek_missing", func(t *testing.T) {
-		wrapped, err := wrapFSFile(newTestBareFile("t.txt", "hello"))
+func TestWrapFile(t *testing.T) {
+	t.Run("fast_path_when_already_satisfies_File", func(t *testing.T) {
+		base := newNullFile("test.txt")
+		for _, readOnly := range []bool{true, false} {
+			got, err := wrapFile(base, readOnly, bufferMemory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != File(base) {
+				t.Errorf("readOnly=%t: expected same value; file already satisfies File", readOnly)
+			}
+		}
+	})
+
+	t.Run("readonly_write_errors", func(t *testing.T) {
+		wrapped, err := wrapFile(newTestBareFile("t.txt", "content"), true, bufferMemory)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer wrapped.Close()
 
-		if wrapped.(*nestFile).buf == nil {
-			t.Error("expected non-nil buffer when underlying lacks Seek")
+		if _, err := wrapped.Write([]byte("x")); !errors.Is(err, fs.ErrInvalid) {
+			t.Errorf("Write() = %v, want fs.ErrInvalid", err)
+		}
+		if _, err := wrapped.WriteString("x"); !errors.Is(err, fs.ErrInvalid) {
+			t.Errorf("WriteString() = %v, want fs.ErrInvalid", err)
 		}
 	})
 
+	t.Run("readwrite_delegates_write", func(t *testing.T) {
+		f := newTestWriterFile("t.txt", "")
+		wrapped, err := wrapFile(f, false, bufferMemory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		if _, err := wrapped.Write([]byte("hello")); err != nil {
+			t.Errorf("Write() = %v, want nil", err)
+		}
+		if string(f.written) != "hello" {
+			t.Errorf("underlying received %q, want %q", f.written, "hello")
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Tests for the buffer polyfill behavior (Seek / ReadAt / Read consistency)
+// ---------------------------------------------------------------------------
+
+func testPolyfillBuffering(t *testing.T, mode bufferMode) {
+	t.Helper()
+
 	t.Run("multiple_seeks_are_consistent", func(t *testing.T) {
 		const content = "abcdefghij"
-		wrapped, err := wrapFSFile(newTestBareFile("t.txt", content))
+		wrapped, err := wrapFile(newTestBareFile("t.txt", content), false, mode)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1084,7 +1125,7 @@ func TestNestFilePolyfillBuffering(t *testing.T) {
 
 	t.Run("readat_at_various_offsets", func(t *testing.T) {
 		const content = "abcdefghij"
-		wrapped, err := wrapFSFile(newTestBareFile("t.txt", content))
+		wrapped, err := wrapFile(newTestBareFile("t.txt", content), false, mode)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1104,6 +1145,139 @@ func TestNestFilePolyfillBuffering(t *testing.T) {
 			if err != nil || n != tc.n || string(buf) != tc.want {
 				t.Errorf("ReadAt(%d, %d) = %q %v; want %q nil", tc.n, tc.off, buf[:n], err, tc.want)
 			}
+		}
+	})
+
+	t.Run("readat_does_not_affect_read_position", func(t *testing.T) {
+		const content = "hello world"
+		wrapped, err := wrapFile(newTestBareFile("t.txt", content), true, mode)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		buf := make([]byte, 5)
+		n, err := wrapped.ReadAt(buf, 6)
+		if err != nil || n != 5 || string(buf) != "world" {
+			t.Fatalf("ReadAt(5, 6) = %q %v; want %q nil", buf[:n], err, "world")
+		}
+		first5 := make([]byte, 5)
+		if _, err := io.ReadFull(wrapped, first5); err != nil {
+			t.Fatal(err)
+		}
+		if string(first5) != "hello" {
+			t.Errorf("Read after ReadAt = %q, want %q", first5, "hello")
+		}
+	})
+
+	t.Run("seek_current_and_end", func(t *testing.T) {
+		const content = "abcdefghij" // 10 bytes
+		wrapped, err := wrapFile(newTestBareFile("t.txt", content), true, mode)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		if _, err := wrapped.Seek(3, io.SeekStart); err != nil {
+			t.Fatal(err)
+		}
+		pos, err := wrapped.Seek(2, io.SeekCurrent)
+		if err != nil {
+			t.Fatalf("Seek(2, SeekCurrent) = %v", err)
+		}
+		if pos != 5 {
+			t.Errorf("Seek(+2 from 3) = %d, want 5", pos)
+		}
+		pos, err = wrapped.Seek(-3, io.SeekEnd)
+		if err != nil {
+			t.Fatalf("Seek(-3, SeekEnd) = %v", err)
+		}
+		if pos != 7 {
+			t.Errorf("Seek(-3 from end) = %d, want 7", pos)
+		}
+		buf := make([]byte, 3)
+		if _, err := io.ReadFull(wrapped, buf); err != nil {
+			t.Fatal(err)
+		}
+		if string(buf) != "hij" {
+			t.Errorf("Read after Seek(-3, SeekEnd) = %q, want %q", buf, "hij")
+		}
+	})
+}
+
+func TestNestFilePolyfillBuffering(t *testing.T) {
+	t.Run("memory", func(t *testing.T) {
+		t.Run("buffer_created_when_seek_missing", func(t *testing.T) {
+			wrapped, err := wrapFile(newTestBareFile("t.txt", "hello"), false, bufferMemory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer wrapped.Close()
+
+			nf := wrapped.(*nestFile)
+			if nf.buf == nil {
+				t.Error("expected non-nil buf when underlying lacks Seek")
+			}
+			if nf.tmpFile != nil {
+				t.Error("expected nil tmpFile in memory mode")
+			}
+		})
+
+		testPolyfillBuffering(t, bufferMemory)
+	})
+
+	t.Run("disk", func(t *testing.T) {
+		t.Run("tmpfile_created_when_seek_missing", func(t *testing.T) {
+			wrapped, err := wrapFile(newTestBareFile("t.txt", "hello"), false, bufferDisk)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer wrapped.Close()
+
+			nf := wrapped.(*nestFile)
+			if nf.tmpFile == nil {
+				t.Error("expected non-nil tmpFile when underlying lacks Seek")
+			}
+			if nf.buf != nil {
+				t.Error("expected nil buf in disk mode")
+			}
+		})
+
+		t.Run("tmpfile_cleaned_up_on_close", func(t *testing.T) {
+			wrapped, err := wrapFile(newTestBareFile("t.txt", "hello"), false, bufferDisk)
+			if err != nil {
+				t.Fatal(err)
+			}
+			nf := wrapped.(*nestFile)
+			tmpName := nf.tmpFile.Name()
+			if err := wrapped.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if nf.tmpFile != nil {
+				t.Error("expected nil tmpFile after close")
+			}
+			if _, err := os.Stat(tmpName); !errors.Is(err, fs.ErrNotExist) {
+				t.Errorf("temp file %q still exists after close", tmpName)
+			}
+		})
+
+		testPolyfillBuffering(t, bufferDisk)
+	})
+
+	t.Run("no_buffer_when_seek_and_readat_present", func(t *testing.T) {
+		f := newTestSeekerFile("t.txt", "hello world")
+		wrapped, err := wrapFile(f, false, bufferDisk)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer wrapped.Close()
+
+		nf := wrapped.(*nestFile)
+		if nf.buf != nil {
+			t.Error("expected nil buf when underlying provides both Seek and ReadAt")
+		}
+		if nf.tmpFile != nil {
+			t.Error("expected nil tmpFile when underlying provides both Seek and ReadAt")
 		}
 	})
 }
