@@ -204,10 +204,10 @@ func TestValidateDownloadURL(t *testing.T) {
 func TestSanitizeFilename(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name     string
-		path     string
-		want     string
-		wantErr  bool
+		name    string
+		path    string
+		want    string
+		wantErr bool
 	}{
 		{"simple", "/archive/file.zip", "file.zip", false},
 		{"nested", "/a/b/c/data.tar.gz", "data.tar.gz", false},
