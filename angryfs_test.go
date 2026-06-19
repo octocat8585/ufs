@@ -17,6 +17,7 @@ package ufs
 import (
 	"errors"
 	"io/fs"
+	"strings"
 	"testing"
 )
 
@@ -133,8 +134,8 @@ func TestAngryFSGlob(t *testing.T) {
 
 func TestAngryFSString(t *testing.T) {
 	fsys := mustAngryFS(t)
-	if got := fsys.String(); got != angryFSPrefix {
-		t.Errorf("String() got: %q, want %q", got, angryFSPrefix)
+	if got := fsys.String(); !strings.Contains(got, angryFSPrefix) {
+		t.Errorf("String() should contain %q, got: %q", angryFSPrefix, got)
 	}
 }
 

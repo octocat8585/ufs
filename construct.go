@@ -129,9 +129,15 @@ func nameToURI(name string) (*url.URL, error) {
 func New(ctx context.Context, name string) (FS, error) {
 	u, err := url.Parse(name)
 	if err == nil {
-		nFS, err := openNestFS(ctx, u.Scheme+"://"+u.Path)
+		baseURI := *u
+		baseURI.RawQuery = ""
+		baseURI.Fragment = ""
+		nFS, err := openNestFS(ctx, baseURI.String())
 		if err == nil {
 			for mountPath, mountURI := range u.Query() {
+				if mountPath == "ro" {
+					continue
+				}
 				mountFS, err := openNestFS(ctx, mountURI[0])
 				if err != nil {
 					return nil, err
@@ -250,6 +256,9 @@ func newBaseFS(ctx context.Context, name string) (FS, error) {
 	}
 	if isNullFSUri(name) {
 		return newNullFS(name)
+	}
+	if isArchiveFSUri(name) {
+		return newArchiveFSFromLocalFS(ctx, strings.TrimPrefix(name, "archive://"))
 	}
 	if isGitFSUri(name) {
 		return newGitFS(name)

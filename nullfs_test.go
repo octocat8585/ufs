@@ -18,13 +18,14 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"strings"
 	"testing"
 )
 
 func TestNullFSString(t *testing.T) {
 	fsys := makeNullFS(nullFSPrefix)
-	if got := fsys.String(); got != nullFSPrefix {
-		t.Errorf("String() want: %q got: %q", nullFSPrefix, got)
+	if got := fsys.String(); !strings.Contains(got, nullFSPrefix) {
+		t.Errorf("String() should contain %q, got: %q", nullFSPrefix, got)
 	}
 }
 

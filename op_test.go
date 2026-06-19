@@ -788,4 +788,3 @@ func TestRemoveAllNull(t *testing.T) {
 		t.Errorf("RemoveAll on nullFS = %v, want nil", err)
 	}
 }
-

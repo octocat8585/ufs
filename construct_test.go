@@ -238,9 +238,9 @@ func TestFSBuilderBuildURI(t *testing.T) {
 			wantURI: "null:",
 		},
 		{
-			name:  "memory with null mount",
-			root:  "memory://",
-			mounts: map[string]string{"data": "null://"},
+			name:    "memory with null mount",
+			root:    "memory://",
+			mounts:  map[string]string{"data": "null://"},
 			wantURI: "memory:?data=null%3A",
 		},
 	} {

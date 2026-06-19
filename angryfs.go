@@ -15,7 +15,9 @@
 package ufs
 
 import (
+	"fmt"
 	"io/fs"
+	"net/url"
 	"strings"
 )
 
@@ -34,8 +36,16 @@ type angryFS struct {
 	name string
 }
 
+func (fsys *angryFS) URI() *url.URL {
+	u, _ := url.Parse(fsys.name)
+	v := u.Query()
+	v.Set("ro", "true")
+	u.RawQuery = v.Encode()
+	return u
+}
+
 func (fsys *angryFS) String() string {
-	return fsys.name
+	return fmt.Sprintf("angryFS(%s)", fsys.URI())
 }
 
 func (fsys *angryFS) Open(name string) (fs.File, error) {

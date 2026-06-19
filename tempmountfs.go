@@ -17,6 +17,7 @@ package ufs
 import (
 	"fmt"
 	"io/fs"
+	"net/url"
 )
 
 var (
@@ -25,12 +26,18 @@ var (
 
 type tempMountFS struct {
 	lfs    FS
+	uri    string
 	name   string
 	closer func() error
 }
 
+func (fsys *tempMountFS) URI() *url.URL {
+	u, _ := url.Parse(fsys.uri)
+	return u
+}
+
 func (fsys *tempMountFS) String() string {
-	return coerceUnix(fsys.name)
+	return fmt.Sprintf("tempMountFS(%s, tmpDir=%s)", fsys.URI(), coerceUnix(fsys.name))
 }
 
 func (fsys *tempMountFS) Open(name string) (fs.File, error) {
@@ -84,7 +91,7 @@ func (fsys *tempMountFS) RemoveAll(name string) error {
 	return fsys.lfs.RemoveAll(name)
 }
 
-func newTempMountFS(name string, prepare func(string) error) (FS, error) {
+func newTempMountFS(uri string, prepare func(string) error) (FS, error) {
 	tempDir, cleanup, err := createOSTempDirectory()
 	if err != nil {
 		cleanup()
@@ -93,21 +100,22 @@ func newTempMountFS(name string, prepare func(string) error) (FS, error) {
 
 	if err := prepare(tempDir); err != nil {
 		cleanup()
-		return nil, fmt.Errorf("cannot prepare temp directory %s, %w", name, err)
+		return nil, fmt.Errorf("cannot prepare temp directory %s, %w", uri, err)
 	}
 
 	lfs, err := newLocalFS(tempDir)
 	if err != nil {
 		cleanup()
-		return nil, fmt.Errorf("cannot create local fs for temp directory %s, %w", name, err)
+		return nil, fmt.Errorf("cannot create local fs for temp directory %s, %w", uri, err)
 	}
 
-	return makeTempMountFS(lfs.(*localFS), tempDir, cleanup), nil
+	return makeTempMountFS(lfs.(*localFS), uri, tempDir, cleanup), nil
 }
 
-func makeTempMountFS(lfs FS, name string, closer func() error) *tempMountFS {
+func makeTempMountFS(lfs FS, uri string, name string, closer func() error) *tempMountFS {
 	return &tempMountFS{
 		lfs:    lfs,
+		uri:    uri,
 		name:   name,
 		closer: closer,
 	}

@@ -22,9 +22,12 @@ import (
 	"strings"
 )
 
-// localFSNormalizePath strips the "file://" URI prefix, leaving a plain path.
+// localFSNormalizePath strips the "file://" or "file:" URI prefix, leaving a plain path.
 func localFSNormalizePath(name string) string {
-	return strings.TrimPrefix(name, "file://")
+	if after, ok := strings.CutPrefix(name, "file://"); ok {
+		return after
+	}
+	return strings.TrimPrefix(name, "file:")
 }
 
 func validLocalPath(op, name string) error {

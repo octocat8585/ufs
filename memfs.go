@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"path"
 	"sort"
 	"strings"
@@ -221,8 +222,13 @@ func (d *memDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 	return batch, nil
 }
 
+func (fsys *memFS) URI() *url.URL {
+	u, _ := url.Parse(fsys.name)
+	return u
+}
+
 func (fsys *memFS) String() string {
-	return fsys.name
+	return fmt.Sprintf("memFS(%s)", fsys.URI())
 }
 
 func (fsys *memFS) isClosed() bool {
