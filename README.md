@@ -1,4 +1,4 @@
-read.me# ufs
+pinread.me# ufs
 
 Unified File System (UFS) is a Go library that allows apps to access multiple
 storage backends through a single fs.FS-based API. It provides a factory
